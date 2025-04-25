@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Activity, Users, AlertTriangle, MessageSquare } from "lucide-react";
 import StatsCard from "@/components/dashboard/StatsCard";
 import CollectionStats from "@/components/dashboard/CollectionStats";
-import CollectionCard from "@/components/collections/CollectionCard";
+import CollectionCard, { CollectionProps } from "@/components/collections/CollectionCard";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Collection, Payment, TelegramUser } from "@/types";
@@ -35,19 +35,25 @@ const Dashboard = () => {
         .select('amount')
         .eq('status', 'confirmed');
 
-      const { data: participantCounts } = await supabase
+      // Count participants per collection using a select count query
+      const { data: participantsCountData } = await supabase
         .from('payments')
-        .select('collection_id, count(*)')
-        .group('collection_id');
+        .select('collection_id, count', { count: 'exact' })
+        .in('collection_id', collections?.map(c => c.id) || []);
+
+      // Create a map of collection ID to participant count
+      const participantCountMap = (participantsCountData || []).reduce<Record<string, number>>((acc, curr) => {
+        if (curr.collection_id) {
+          acc[curr.collection_id] = Number(curr.count) || 0;
+        }
+        return acc;
+      }, {});
 
       // Convert collections data to match the Collection type
       const typedCollections = collections?.map(collection => {
-        // Ensure status is one of the allowed values
-        let status: "active" | "finished" | "cancelled";
-        
-        if (collection.status === "active") status = "active";
-        else if (collection.status === "finished") status = "finished";
-        else status = "cancelled";
+        let status: "active" | "finished" | "cancelled" = "active";
+        if (collection.status === "finished") status = "finished";
+        else if (collection.status === "cancelled") status = "cancelled";
         
         return {
           ...collection,
@@ -74,8 +80,7 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
-  // Function to prepare collection props for CollectionCard
-  const prepareCollectionProps = (collection: Collection) => {
+  const prepareCollectionProps = (collection: Collection): CollectionProps => {
     return {
       id: collection.id,
       title: collection.title,
@@ -87,7 +92,7 @@ const Dashboard = () => {
       currentAmount: collection.current_amount || 0,
       status: collection.status,
       deadline: collection.deadline,
-      participantsCount: 0, // This would ideally come from a query counting participants
+      participantsCount: 0, // This would come from the participantCountMap if needed
     };
   };
 
