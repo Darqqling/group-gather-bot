@@ -9,7 +9,176 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      app_settings: {
+        Row: {
+          description: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          value: string
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          value: string
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
+      collections: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          current_amount: number | null
+          deadline: string
+          description: string | null
+          id: string
+          last_updated_at: string | null
+          status: string
+          target_amount: number
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          current_amount?: number | null
+          deadline: string
+          description?: string | null
+          id?: string
+          last_updated_at?: string | null
+          status: string
+          target_amount: number
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          current_amount?: number | null
+          deadline?: string
+          description?: string | null
+          id?: string
+          last_updated_at?: string | null
+          status?: string
+          target_amount?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collections_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      error_logs: {
+        Row: {
+          context: Json | null
+          created_at: string | null
+          id: string
+          message: string
+          stack: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string | null
+          id?: string
+          message: string
+          stack?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string | null
+          id?: string
+          message?: string
+          stack?: string | null
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          collection_id: string
+          confirmed_at: string | null
+          created_at: string | null
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          collection_id: string
+          confirmed_at?: string | null
+          created_at?: string | null
+          id?: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          collection_id?: string
+          confirmed_at?: string | null
+          created_at?: string | null
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_users: {
+        Row: {
+          first_name: string | null
+          id: string
+          joined_at: string | null
+          last_active_at: string | null
+          last_name: string | null
+          telegram_id: string
+          username: string | null
+        }
+        Insert: {
+          first_name?: string | null
+          id?: string
+          joined_at?: string | null
+          last_active_at?: string | null
+          last_name?: string | null
+          telegram_id: string
+          username?: string | null
+        }
+        Update: {
+          first_name?: string | null
+          id?: string
+          joined_at?: string | null
+          last_active_at?: string | null
+          last_name?: string | null
+          telegram_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
