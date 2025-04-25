@@ -1,13 +1,26 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import Layout from "@/components/layout/Layout";
+import Dashboard from "@/pages/Dashboard";
+import Collections from "@/pages/Collections";
+import Users from "@/pages/Users";
+import Logs from "@/pages/Logs";
+import Settings from "@/pages/Settings";
+import Help from "@/pages/Help";
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="collections" element={<Collections />} />
+        <Route path="users" element={<Users />} />
+        <Route path="analytics" element={<Navigate to="/" />} />
+        <Route path="logs" element={<Logs />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="help" element={<Help />} />
+      </Route>
+    </Routes>
   );
 };
 
