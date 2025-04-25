@@ -35,9 +35,29 @@ const Dashboard = () => {
         .select('amount')
         .eq('status', 'confirmed');
 
-      const activeCount = collections?.filter(c => c.status === 'active').length || 0;
-      const completedCount = collections?.filter(c => c.status === 'finished').length || 0;
-      const canceledCount = collections?.filter(c => c.status === 'cancelled').length || 0;
+      const { data: participantCounts } = await supabase
+        .from('payments')
+        .select('collection_id, count(*)')
+        .group('collection_id');
+
+      // Convert collections data to match the Collection type
+      const typedCollections = collections?.map(collection => {
+        // Ensure status is one of the allowed values
+        let status: "active" | "finished" | "cancelled";
+        
+        if (collection.status === "active") status = "active";
+        else if (collection.status === "finished") status = "finished";
+        else status = "cancelled";
+        
+        return {
+          ...collection,
+          status
+        } as Collection;
+      }) || [];
+
+      const activeCount = typedCollections.filter(c => c.status === 'active').length || 0;
+      const completedCount = typedCollections.filter(c => c.status === 'finished').length || 0;
+      const canceledCount = typedCollections.filter(c => c.status === 'cancelled').length || 0;
       const totalAmount = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
 
       setStats({
@@ -48,11 +68,28 @@ const Dashboard = () => {
         totalAmount
       });
 
-      if (collections) setRecentCollections(collections);
+      setRecentCollections(typedCollections);
     };
 
     fetchDashboardData();
   }, []);
+
+  // Function to prepare collection props for CollectionCard
+  const prepareCollectionProps = (collection: Collection) => {
+    return {
+      id: collection.id,
+      title: collection.title,
+      description: collection.description || "",
+      creator: {
+        name: "User", // This would ideally come from a join with telegram_users
+      },
+      targetAmount: collection.target_amount,
+      currentAmount: collection.current_amount || 0,
+      status: collection.status,
+      deadline: collection.deadline,
+      participantsCount: 0, // This would ideally come from a query counting participants
+    };
+  };
 
   return (
     <div className="space-y-4">
@@ -91,7 +128,7 @@ const Dashboard = () => {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {recentCollections.map((collection) => (
-              <CollectionCard key={collection.id} {...collection} />
+              <CollectionCard key={collection.id} {...prepareCollectionProps(collection)} />
             ))}
           </div>
         </div>

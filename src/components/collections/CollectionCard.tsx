@@ -5,9 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check, Clock, X } from "lucide-react";
 
-type CollectionStatus = "active" | "finished" | "cancelled";
+export type CollectionStatus = "active" | "finished" | "cancelled";
 
-interface CollectionProps {
+export interface CollectionProps {
   id: string;
   title: string;
   description: string;
