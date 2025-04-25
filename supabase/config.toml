@@ -1,1 +1,26 @@
+
 project_id = "smlqmythgpkucxbaxuob"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+
+[realtime]
+enabled = true
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[analytics]
+enabled = false
+
+[functions.telegram-webhook]
+verify_jwt = false

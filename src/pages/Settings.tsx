@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import WebhookSettings from "@/components/settings/WebhookSettings";
 
 const Settings = () => {
   return (
@@ -97,6 +97,16 @@ const Settings = () => {
               
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
+                  <Label htmlFor="maintenance-mode">Maintenance Mode</Label>
+                  <div className="text-sm text-muted-foreground">
+                    When enabled, the bot will inform users about temporary service unavailability
+                  </div>
+                </div>
+                <Switch id="maintenance-mode" />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
                   <Label htmlFor="active">Bot Active</Label>
                   <div className="text-sm text-muted-foreground">
                     Enable or disable the bot
@@ -109,6 +119,8 @@ const Settings = () => {
               <Button>Save Bot Settings</Button>
             </CardFooter>
           </Card>
+          
+          <WebhookSettings />
           
           <Card>
             <CardHeader>
@@ -220,33 +232,6 @@ const Settings = () => {
                 <p className="text-sm text-muted-foreground">
                   Used for connecting to the Telegram Bot API.
                 </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="webhook-url">Webhook URL</Label>
-                <div className="flex">
-                  <Input
-                    id="webhook-url"
-                    defaultValue="https://api.example.com/telegram/webhook"
-                    readOnly
-                  />
-                  <Button className="ml-2" variant="outline">
-                    Copy
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  URL that will receive updates from Telegram.
-                </p>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="webhook-enabled">Webhook Enabled</Label>
-                  <div className="text-sm text-muted-foreground">
-                    Use webhooks instead of polling
-                  </div>
-                </div>
-                <Switch id="webhook-enabled" defaultChecked />
               </div>
             </CardContent>
             <CardFooter>
