@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,9 +10,7 @@ import {
   Users, 
   LogOut,
   HelpCircle,
-  MessageCircle,
-  AlertTriangle,
-  Plus
+  MessageCircle
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -81,15 +78,6 @@ const Sidebar = ({ open, setOpen }: { open: boolean; setOpen: (open: boolean) =>
             >
               <BarChart3 className="h-5 w-5" />
               Analytics
-            </NavLink>
-            <NavLink to="/logs" 
-              className={({isActive}) => 
-                cn("flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-                isActive ? "bg-accent text-accent-foreground" : "transparent")
-              }
-            >
-              <AlertTriangle className="h-5 w-5" />
-              Error Logs
             </NavLink>
             <NavLink to="/settings" 
               className={({isActive}) => 

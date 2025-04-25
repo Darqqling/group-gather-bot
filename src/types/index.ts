@@ -39,13 +39,3 @@ export interface ErrorLog {
   context: Record<string, any> | null;
   created_at: string | null;
 }
-
-export interface LogEntry {
-  id: string;
-  timestamp: string;
-  level: 'info' | 'warning' | 'error';
-  message: string;
-  userId?: string;
-  commandType?: string;
-  details?: string;
-}
