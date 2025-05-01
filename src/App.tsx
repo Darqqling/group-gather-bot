@@ -6,11 +6,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { initializeMaintenanceSettings } from "./services/maintenanceService";
 
 const App = () => {
   // Move QueryClient initialization inside the component
   const [queryClient] = useState(() => new QueryClient());
+
+  useEffect(() => {
+    // Initialize maintenance settings when the app starts
+    initializeMaintenanceSettings().catch(err => {
+      console.error("Failed to initialize maintenance settings:", err);
+    });
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

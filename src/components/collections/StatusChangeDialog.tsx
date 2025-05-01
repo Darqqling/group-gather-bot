@@ -1,28 +1,29 @@
 
+import { useState } from "react";
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { useState } from "react";
 
 interface StatusChangeDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (newStatus: "active" | "finished" | "cancelled") => void;
-  currentStatus: "active" | "finished" | "cancelled";
+  onConfirm: (status: "active" | "finished" | "cancelled") => void;
+  currentStatus: string;
 }
 
 const StatusChangeDialog = ({
@@ -31,47 +32,56 @@ const StatusChangeDialog = ({
   onConfirm,
   currentStatus,
 }: StatusChangeDialogProps) => {
-  const [status, setStatus] = useState<"active" | "finished" | "cancelled">(currentStatus);
+  const [selectedStatus, setSelectedStatus] = useState<"active" | "finished" | "cancelled">(
+    currentStatus as "active" | "finished" | "cancelled"
+  );
 
-  const handleSave = () => {
-    onConfirm(status);
+  const handleConfirm = () => {
+    onConfirm(selectedStatus);
+  };
+
+  const handleValueChange = (value: string) => {
+    setSelectedStatus(value as "active" | "finished" | "cancelled");
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Изменить статус сбора</DialogTitle>
+          <DialogTitle>Change Collection Status</DialogTitle>
           <DialogDescription>
-            Выберите новый статус для сбора. Это действие отобразится всем участникам.
+            Select a new status for this collection.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="status" className="text-right">
-              Статус
-            </Label>
-            <Select 
-              value={status} 
-              onValueChange={(value) => setStatus(value as "active" | "finished" | "cancelled")}
-              className="col-span-3"
-            >
-              <SelectTrigger id="status">
-                <SelectValue placeholder="Выберите статус" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Активен</SelectItem>
-                <SelectItem value="finished">Завершен</SelectItem>
-                <SelectItem value="cancelled">Отменен</SelectItem>
-              </SelectContent>
-            </Select>
+
+        <div className="py-4">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={selectedStatus}
+                onValueChange={handleValueChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="finished">Finished</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Отмена
+            Cancel
           </Button>
-          <Button onClick={handleSave}>Сохранить</Button>
+          <Button onClick={handleConfirm}>Confirm</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
