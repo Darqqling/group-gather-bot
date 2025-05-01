@@ -1,8 +1,9 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getDefaultWebhookUrl, getWebhookUrl, setWebhookUrl, setupWebhook } from "@/services/webhookService";
+import { getDefaultWebhookUrl, getWebhookUrl, setWebhookUrl } from "@/services/webhookService";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import WebhookUrlInput from "./webhook/WebhookUrlInput";
 import WebhookStatus from "./webhook/WebhookStatus";
 import WebhookControls from "./webhook/WebhookControls";
@@ -60,11 +61,13 @@ const WebhookSettings = () => {
     }
   };
 
-  const setupWebhookHandler = async () => {
+  const setupWebhook = async () => {
     setIsSettingUp(true);
     try {
-      const data = await setupWebhook(webhookUrl);
+      const { data, error } = await supabase.functions.invoke('setup-telegram-webhook')
       
+      if (error) throw error;
+
       if (data.success) {
         setWebhookStatus(data.webhookInfo);
         toast({
@@ -107,7 +110,7 @@ const WebhookSettings = () => {
         />
         
         <WebhookControls
-          onSetup={setupWebhookHandler}
+          onSetup={setupWebhook}
           onReset={resetToDefault}
           onSave={saveWebhookUrl}
           isSettingUp={isSettingUp}

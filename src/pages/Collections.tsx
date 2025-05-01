@@ -1,238 +1,149 @@
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import CollectionsAdminTable from "@/components/collections/CollectionsAdminTable";
-import { Collection } from "@/types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
-import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import CollectionCard from "@/components/collections/CollectionCard";
+
+// Mock data
+const collections = [
+  {
+    id: "col-1",
+    title: "Team Lunch",
+    description: "Monthly team gathering at a local restaurant",
+    creator: {
+      name: "Alex Smith",
+      avatar: "/placeholder.svg",
+    },
+    targetAmount: 10000,
+    currentAmount: 8500,
+    status: "active" as const,
+    deadline: "2025-05-10",
+    participantsCount: 12,
+  },
+  {
+    id: "col-2",
+    title: "Birthday Gift",
+    description: "Collecting for Maria's birthday present",
+    creator: {
+      name: "John Doe",
+      avatar: "/placeholder.svg",
+    },
+    targetAmount: 5000,
+    currentAmount: 5000,
+    status: "finished" as const,
+    deadline: "2025-04-20",
+    participantsCount: 8,
+  },
+  {
+    id: "col-3",
+    title: "Office Equipment",
+    description: "New coffee machine for the office kitchen",
+    creator: {
+      name: "Emily Parker",
+      avatar: "/placeholder.svg",
+    },
+    targetAmount: 15000,
+    currentAmount: 3200,
+    status: "active" as const,
+    deadline: "2025-06-15",
+    participantsCount: 25,
+  },
+  {
+    id: "col-4",
+    title: "Charity Donation",
+    description: "Collecting for the local animal shelter",
+    creator: {
+      name: "Sarah Williams",
+      avatar: "/placeholder.svg",
+    },
+    targetAmount: 20000,
+    currentAmount: 12800,
+    status: "active" as const,
+    deadline: "2025-05-30",
+    participantsCount: 32,
+  },
+  {
+    id: "col-5",
+    title: "Group Trip",
+    description: "Weekend trip to the mountains",
+    creator: {
+      name: "Michael Brown",
+      avatar: "/placeholder.svg",
+    },
+    targetAmount: 30000,
+    currentAmount: 4500,
+    status: "cancelled" as const,
+    deadline: "2025-04-10",
+    participantsCount: 6,
+  },
+  {
+    id: "col-6",
+    title: "Wedding Gift",
+    description: "For Jessica and David's wedding",
+    creator: {
+      name: "Thomas Wilson",
+      avatar: "/placeholder.svg",
+    },
+    targetAmount: 25000,
+    currentAmount: 25000,
+    status: "finished" as const,
+    deadline: "2025-03-28",
+    participantsCount: 15,
+  },
+];
 
 const Collections = () => {
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [creatorFilter, setCreatorFilter] = useState<string>("");
-  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
-  const [amountFilter, setAmountFilter] = useState<number | "">("");
-  const [creators, setCreators] = useState<{id: string, name: string}[]>([]);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    fetchCollections();
-    fetchCreators();
-  }, []);
-
-  const fetchCollections = async () => {
-    setIsLoading(true);
-    try {
-      let query = supabase.from("collections").select("*");
-      
-      // Apply filters if present
-      if (statusFilter) {
-        query = query.eq("status", statusFilter);
-      }
-      
-      if (creatorFilter) {
-        query = query.eq("creator_id", creatorFilter);
-      }
-      
-      if (dateFilter) {
-        // Format date for comparison
-        const dateString = dateFilter.toISOString().split('T')[0];
-        query = query.gte("deadline", dateString);
-      }
-      
-      if (amountFilter !== "") {
-        query = query.gte("target_amount", amountFilter);
-      }
-      
-      const { data, error } = await query.order("created_at", { ascending: false });
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Apply search term filter client-side
-      let filteredData = data;
-      if (searchTerm) {
-        filteredData = data.filter(
-          (collection) => 
-            collection.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (collection.description && 
-             collection.description.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-      }
-      
-      setCollections(filteredData);
-    } catch (error) {
-      console.error("Error fetching collections:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load collections",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchCreators = async () => {
-    try {
-      const { data, error } = await supabase.from("telegram_users").select("id, first_name, last_name");
-      
-      if (error) {
-        throw error;
-      }
-      
-      setCreators(data.map(user => ({
-        id: user.id,
-        name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.id
-      })));
-    } catch (error) {
-      console.error("Error fetching creators:", error);
-    }
-  };
-
-  const handleChangeStatus = async (id: string, status: 'active' | 'finished' | 'cancelled') => {
-    try {
-      const { error } = await supabase
-        .from("collections")
-        .update({ status, last_updated_at: new Date().toISOString() })
-        .eq("id", id);
-        
-      if (error) {
-        throw error;
-      }
-      
-      // Update local state to reflect the change
-      setCollections(collections.map(collection => 
-        collection.id === id ? { ...collection, status } : collection
-      ));
-      
-      toast({
-        title: "Status Updated",
-        description: `Collection status has been updated to ${status}`,
-      });
-    } catch (error) {
-      console.error("Error updating collection status:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update collection status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const applyFilters = () => {
-    fetchCollections();
-  };
-
-  const clearFilters = () => {
-    setSearchTerm("");
-    setStatusFilter("");
-    setCreatorFilter("");
-    setDateFilter(undefined);
-    setAmountFilter("");
-    fetchCollections();
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Collections</h1>
+        <Button className="w-full md:w-auto">
+          <Plus className="mr-2 h-4 w-4" /> New Collection
+        </Button>
       </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Filter Collections</CardTitle>
-          <CardDescription>
-            Filter and search through all collections
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="search">Search</Label>
-              <Input 
-                id="search" 
-                placeholder="Search by title or description"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger id="status">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="finished">Finished</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="creator">Creator</Label>
-              <Select value={creatorFilter} onValueChange={setCreatorFilter}>
-                <SelectTrigger id="creator">
-                  <SelectValue placeholder="All creators" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All creators</SelectItem>
-                  {creators.map((creator) => (
-                    <SelectItem key={creator.id} value={creator.id}>
-                      {creator.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="amount">Min Amount</Label>
-              <Input
-                id="amount"
-                type="number"
-                placeholder="Minimum amount"
-                value={amountFilter}
-                onChange={(e) => setAmountFilter(e.target.value ? Number(e.target.value) : "")}
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-end space-x-4">
-            <div className="space-y-2">
-              <Label>Deadline After</Label>
-              <DatePicker
-                date={dateFilter}
-                onSelect={setDateFilter}
-              />
-            </div>
-            <div className="space-x-2">
-              <Button onClick={applyFilters}>Apply Filters</Button>
-              <Button variant="outline" onClick={clearFilters}>Clear Filters</Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {isLoading ? (
-        <div className="text-center py-8">Loading collections...</div>
-      ) : collections.length === 0 ? (
-        <div className="text-center py-8">No collections found</div>
-      ) : (
-        <CollectionsAdminTable collections={collections} onChangeStatus={handleChangeStatus} />
-      )}
+
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex-1">
+          <Input placeholder="Search collections..." />
+        </div>
+        <div className="flex gap-4">
+          <Select defaultValue="all">
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="finished">Finished</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select defaultValue="newest">
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest</SelectItem>
+              <SelectItem value="oldest">Oldest</SelectItem>
+              <SelectItem value="amount-high">Amount (High-Low)</SelectItem>
+              <SelectItem value="amount-low">Amount (Low-High)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {collections.map((collection) => (
+          <CollectionCard key={collection.id} {...collection} />
+        ))}
+      </div>
     </div>
   );
 };

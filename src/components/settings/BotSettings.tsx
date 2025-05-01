@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import WebhookSettings from "./WebhookSettings";
-import MaintenanceMode from "./MaintenanceMode";
 
 const BotSettings = () => {
   return (
@@ -40,6 +39,16 @@ const BotSettings = () => {
           
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
+              <Label htmlFor="maintenance-mode">Maintenance Mode</Label>
+              <div className="text-sm text-muted-foreground">
+                When enabled, the bot will inform users about temporary service unavailability
+              </div>
+            </div>
+            <Switch id="maintenance-mode" />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
               <Label htmlFor="active">Bot Active</Label>
               <div className="text-sm text-muted-foreground">
                 Enable or disable the bot
@@ -52,8 +61,6 @@ const BotSettings = () => {
           <Button>Save Bot Settings</Button>
         </CardFooter>
       </Card>
-      
-      <MaintenanceMode />
       
       <WebhookSettings />
       
