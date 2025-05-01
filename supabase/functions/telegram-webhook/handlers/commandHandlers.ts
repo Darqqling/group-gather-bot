@@ -13,7 +13,7 @@ export async function handleStartCommand(message: any, sendTelegramMessage: Func
       keyboard: [
         [{ text: '/new' }, { text: '/history' }],
         [{ text: '/finish' }, { text: '/cancel' }],
-        [{ text: '/paid' }]
+        [{ text: '/paid' }, { text: '/confirm' }]
       ],
       resize_keyboard: true,
       one_time_keyboard: false
@@ -26,6 +26,7 @@ export async function handleStartCommand(message: any, sendTelegramMessage: Func
       "✅ /finish - завершить активный сбор\n" +
       "❌ /cancel - отменить активный сбор\n" +
       "💰 /paid - подтвердить оплату\n" +
+      "✓ /confirm - подтвердить взнос (для организаторов)\n" +
       "📊 /history - история ваших сборов",
       { reply_markup: JSON.stringify(replyMarkup) }
     );
@@ -113,6 +114,23 @@ export async function handlePaidCommand(message: any, sendTelegramMessage: Funct
 }
 
 /**
+ * Handle the /confirm command (for organizers to confirm payments)
+ */
+export async function handleConfirmCommand(message: any, sendTelegramMessage: Function) {
+  await sendTelegramMessage(
+    message.chat.id,
+    "Выберите сбор для подтверждения платежей участников:",
+    {
+      reply_markup: JSON.stringify({
+        inline_keyboard: [
+          [{ text: "Выбрать из списка", callback_data: "list_collections_to_confirm_payments" }]
+        ]
+      })
+    }
+  );
+}
+
+/**
  * Handle the /history command
  */
 export async function handleHistoryCommand(message: any, sendTelegramMessage: Function, supabaseAdmin: any) {
@@ -184,12 +202,25 @@ export function handleCommand(message: any, sendTelegramMessage: Function, supab
       return handleCancelCommand(message, sendTelegramMessage);
     case '/paid':
       return handlePaidCommand(message, sendTelegramMessage);
+    case '/confirm':
+      return handleConfirmCommand(message, sendTelegramMessage);
     case '/history':
       return handleHistoryCommand(message, sendTelegramMessage, supabaseAdmin);
     default:
       return sendTelegramMessage(
         message.chat.id,
-        "Извините, я не распознал команду. Используйте /start, /new, /finish, /cancel, /paid, /history."
+        "Извините, я не распознал команду. Используйте /start, /new, /finish, /cancel, /paid, /confirm, /history.",
+        {
+          reply_markup: JSON.stringify({
+            keyboard: [
+              [{ text: '/new' }, { text: '/history' }],
+              [{ text: '/finish' }, { text: '/cancel' }],
+              [{ text: '/paid' }, { text: '/confirm' }],
+              [{ text: '/start' }]
+            ],
+            resize_keyboard: true
+          })
+        }
       );
   }
 }

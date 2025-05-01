@@ -21,6 +21,46 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false }
 });
 
+// Check if maintenance mode is enabled
+async function isMaintenanceMode() {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'maintenance_mode')
+      .single();
+    
+    if (error) {
+      console.error("Error checking maintenance mode:", error);
+      return false;
+    }
+    
+    return data?.value === 'true';
+  } catch (error) {
+    console.error("Exception checking maintenance mode:", error);
+    return false;
+  }
+}
+
+// Get maintenance message
+async function getMaintenanceMessage() {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'maintenance_message')
+      .single();
+    
+    if (error || !data) {
+      return "Сервис временно недоступен. Пожалуйста, попробуйте позже.";
+    }
+    
+    return data.value;
+  } catch (error) {
+    return "Сервис временно недоступен. Пожалуйста, попробуйте позже.";
+  }
+}
+
 serve(async (req) => {
   console.log("Webhook received a request");
   
@@ -46,21 +86,42 @@ serve(async (req) => {
       );
     }
 
-    // Process different types of updates
+    // Check maintenance mode
+    const maintenanceMode = await isMaintenanceMode();
+    
+    // Handle updates based on type
     if (update.message) {
-      await handleMessage(
-        update.message, 
-        (user) => saveUser(user, supabaseAdmin),
-        sendTelegramMessage,
-        supabaseAdmin
-      );
+      // Save or update the user regardless of maintenance mode
+      await saveUser(update.message.from, supabaseAdmin);
+      
+      if (maintenanceMode) {
+        // If in maintenance mode, send the maintenance message
+        const maintenanceMessage = await getMaintenanceMessage();
+        await sendTelegramMessage(update.message.chat.id, maintenanceMessage);
+      } else {
+        // Regular message handling
+        await handleMessage(
+          update.message, 
+          (user) => saveUser(user, supabaseAdmin),
+          sendTelegramMessage,
+          supabaseAdmin
+        );
+      }
     } else if (update.callback_query) {
-      await handleCallbackQuery(
-        update.callback_query,
-        sendTelegramMessage,
-        answerCallbackQuery,
-        supabaseAdmin
-      );
+      if (maintenanceMode) {
+        // If in maintenance mode, answer callback query with maintenance message
+        const maintenanceMessage = await getMaintenanceMessage();
+        await answerCallbackQuery(update.callback_query.id, "Сервис на обслуживании");
+        await sendTelegramMessage(update.callback_query.message.chat.id, maintenanceMessage);
+      } else {
+        // Regular callback query handling
+        await handleCallbackQuery(
+          update.callback_query,
+          sendTelegramMessage,
+          answerCallbackQuery,
+          supabaseAdmin
+        );
+      }
     }
 
     // Always respond with success to Telegram
