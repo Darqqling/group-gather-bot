@@ -1,6 +1,6 @@
 
 // Message handlers for the Telegram bot
-import { handleCommand } from './commandHandlers';
+import { handleCommand } from './commandHandlers.ts';
 
 /**
  * Handle incoming messages from Telegram

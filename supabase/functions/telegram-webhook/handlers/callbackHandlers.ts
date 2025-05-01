@@ -1,19 +1,71 @@
-
-// Callback query handlers for the Telegram bot
+import { sendTelegramMessage, answerCallbackQuery } from "../utils/telegramApi.ts";
 
 /**
- * List collections for a specific action (finish, cancel, pay)
+ * Handle callback queries from Telegram
  */
-export async function listCollectionsForAction(chatId: number, userId: number, action: string, sendTelegramMessage: Function, supabaseAdmin: any) {
+export async function handleCallbackQuery(callbackQuery: any, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any) {
+  if (!callbackQuery || !callbackQuery.data) {
+    console.log("Invalid callback query format or missing data");
+    return;
+  }
+
+  console.log(`Processing callback query from ${callbackQuery.from.first_name} (${callbackQuery.from.id}): ${callbackQuery.data}`);
+
+  const chatId = callbackQuery.message.chat.id;
+  const messageId = callbackQuery.message.message_id;
+  const data = callbackQuery.data;
+
   try {
+    switch (data) {
+      case "list_collections_to_finish":
+        await handleListCollections(chatId, messageId, 'finish', sendTelegramMessage, answerCallbackQuery, supabaseAdmin, callbackQuery.from.id.toString());
+        break;
+      case "list_collections_to_cancel":
+        await handleListCollections(chatId, messageId, 'cancel', sendTelegramMessage, answerCallbackQuery, supabaseAdmin, callbackQuery.from.id.toString());
+        break;
+      case "list_collections_to_pay":
+        await handleListCollections(chatId, messageId, 'pay', sendTelegramMessage, answerCallbackQuery, supabaseAdmin, callbackQuery.from.id.toString());
+        break;
+      default:
+        if (data.startsWith("finish_collection_")) {
+          const collectionId = data.split("_")[2];
+          await handleFinishCollection(chatId, messageId, collectionId, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+        } else if (data.startsWith("cancel_collection_")) {
+          const collectionId = data.split("_")[2];
+          await handleCancelCollection(chatId, messageId, collectionId, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+        } else if (data.startsWith("pay_collection_")) {
+          const collectionId = data.split("_")[2];
+          await handlePayCollection(chatId, messageId, collectionId, sendTelegramMessage, answerCallbackQuery, supabaseAdmin, callbackQuery.from.id.toString());
+        } else {
+          console.log("Unknown callback query data:", data);
+          await answerCallbackQuery(callbackQuery.id, "Неизвестный запрос.");
+        }
+        break;
+    }
+  } catch (error) {
+    console.error("Error handling callback query:", error);
+    await sendTelegramMessage(chatId, "Произошла ошибка при обработке запроса.");
+    await answerCallbackQuery(callbackQuery.id, "Произошла ошибка.");
+  }
+}
+
+/**
+ * Handle listing collections for finish/cancel/pay actions
+ */
+async function handleListCollections(chatId: string, messageId: number, action: string, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any, userId: string) {
+  try {
+    // Fetch user collections
     const { data: collections, error } = await supabaseAdmin
       .from("collections")
       .select("*")
-      .eq("creator_id", userId.toString())
-      .eq("status", "active");
-    
-    if (error) throw error;
-    
+      .eq("creator_id", userId)
+      .eq("status", 'active')
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
     if (!collections || collections.length === 0) {
       await sendTelegramMessage(
         chatId,
@@ -21,79 +73,170 @@ export async function listCollectionsForAction(chatId: number, userId: number, a
       );
       return;
     }
-    
-    const keyboard = collections.map(collection => {
-      return [{
-        text: `${collection.title} (${collection.current_amount || 0}/${collection.target_amount} ₽)`,
-        callback_data: `select_collection_${action}_${collection.id}`
-      }];
-    });
-    
+
+    let inline_keyboard = [];
+
+    for (const collection of collections) {
+      inline_keyboard.push([{
+        text: collection.title,
+        callback_data: `${action}_collection_${collection.id}`
+      }]);
+    }
+
+    // Add cancel button
+    inline_keyboard.push([{ text: "❌ Отмена", callback_data: "cancel" }]);
+
     await sendTelegramMessage(
       chatId,
-      "Выберите сбор из списка:",
+      `Выберите сбор, который хотите ${action === 'finish' ? 'завершить' : action === 'cancel' ? 'отменить' : 'подтвердить оплату'}:`,
       {
         reply_markup: JSON.stringify({
-          inline_keyboard: keyboard
+          inline_keyboard
         })
       }
     );
+
+    await answerCallbackQuery(
+      { callback_query_id: messageId },
+      "Список сборов получен."
+    );
   } catch (error) {
-    console.error("Error listing collections:", error);
+    console.error("Error handling list collections:", error);
     await sendTelegramMessage(
       chatId,
       "Произошла ошибка при получении списка сборов. Пожалуйста, попробуйте позже."
+    );
+    await answerCallbackQuery(
+      { callback_query_id: messageId },
+      "Произошла ошибка."
     );
   }
 }
 
 /**
- * Handle action on a collection (finish, cancel, pay)
+ * Handle finishing a collection
  */
-export async function handleCollectionAction(chatId: number, collectionId: string, action: string, sendTelegramMessage: Function) {
-  // This function will handle specific actions on collections
-  // Implementation depends on the action (finish, cancel, pay)
-  const actionMessages = {
-    'finish': "Сбор успешно завершен!",
-    'cancel': "Сбор отменен.",
-    'pay': "Пожалуйста, укажите сумму, которую вы хотите внести:"
-  };
-  
-  await sendTelegramMessage(chatId, actionMessages[action] || "Действие выполнено.");
+async function handleFinishCollection(chatId: string, messageId: number, collectionId: string, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any) {
+  try {
+    // Update collection status to finished
+    const { error } = await supabaseAdmin
+      .from("collections")
+      .update({ status: 'finished' })
+      .eq("id", collectionId);
+
+    if (error) {
+      throw error;
+    }
+
+    await sendTelegramMessage(
+      chatId,
+      "Сбор успешно завершен."
+    );
+
+    // Edit the original message to remove the keyboard
+    await sendTelegramMessage(
+      chatId,
+      "Сбор успешно завершен.",
+      {
+        reply_markup: JSON.stringify({
+          remove_keyboard: true
+        })
+      }
+    );
+
+    await answerCallbackQuery(
+      { callback_query_id: messageId },
+      "Сбор успешно завершен."
+    );
+  } catch (error) {
+    console.error("Error handling finish collection:", error);
+    await sendTelegramMessage(
+      chatId,
+      "Произошла ошибка при завершении сбора. Пожалуйста, попробуйте позже."
+    );
+    await answerCallbackQuery(
+      { callback_query_id: messageId },
+      "Произошла ошибка."
+    );
+  }
 }
 
 /**
- * Main handler for callback queries
+ * Handle cancelling a collection
  */
-export async function handleCallbackQuery(
-  callbackQuery: any, 
-  sendTelegramMessage: Function, 
-  answerCallbackQuery: Function,
-  supabaseAdmin: any
-) {
-  console.log("Received callback query:", callbackQuery);
-  
-  const chatId = callbackQuery.message.chat.id;
-  const data = callbackQuery.data;
-  
+async function handleCancelCollection(chatId: string, messageId: number, collectionId: string, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any) {
   try {
-    if (data.startsWith('list_collections_to_')) {
-      // Handle listing collections for various actions
-      const action = data.replace('list_collections_to_', '');
-      await listCollectionsForAction(chatId, callbackQuery.from.id, action, sendTelegramMessage, supabaseAdmin);
-    } else if (data.startsWith('select_collection_')) {
-      // Handle specific collection selection
-      const [, action, collectionId] = data.split('_');
-      await handleCollectionAction(chatId, collectionId, action, sendTelegramMessage);
+    // Update collection status to cancelled
+    const { error } = await supabaseAdmin
+      .from("collections")
+      .update({ status: 'cancelled' })
+      .eq("id", collectionId);
+
+    if (error) {
+      throw error;
     }
-    
-    // Answer callback query to remove loading state
-    await answerCallbackQuery(callbackQuery.id);
-  } catch (error) {
-    console.error("Error handling callback query:", error);
+
+   // Edit the original message to remove the keyboard
     await sendTelegramMessage(
       chatId,
-      "Произошла ошибка при обработке запроса. Пожалуйста, попробуйте позже."
+      "Сбор отменен.",
+      {
+        reply_markup: JSON.stringify({
+          remove_keyboard: true
+        })
+      }
+    );
+
+    await answerCallbackQuery(
+      { callback_query_id: messageId },
+      "Сбор успешно отменен."
+    );
+  } catch (error) {
+    console.error("Error handling cancel collection:", error);
+    await sendTelegramMessage(
+      chatId,
+      "Произошла ошибка при отмене сбора. Пожалуйста, попробуйте позже."
+    );
+    await answerCallbackQuery(
+      { callback_query_id: messageId },
+      "Произошла ошибка."
+    );
+  }
+}
+
+/**
+ * Handle paying for a collection
+ */
+async function handlePayCollection(chatId: string, messageId: number, collectionId: string, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any, userId: string) {
+  try {
+    // Ask the user to enter the amount they want to pay
+    await sendTelegramMessage(
+      chatId,
+      "Введите сумму, которую вы хотите внести:"
+    );
+
+    // Update user state in database to indicate they're entering payment amount
+    await supabaseAdmin
+      .from("telegram_users")
+      .update({
+        current_state: "entering_payment_amount",
+        state_data: JSON.stringify({ collection_id: collectionId })
+      })
+      .eq("telegram_id", userId);
+
+    await answerCallbackQuery(
+      { callback_query_id: messageId },
+      "Ожидаю сумму оплаты."
+    );
+  } catch (error) {
+    console.error("Error handling pay collection:", error);
+    await sendTelegramMessage(
+      chatId,
+      "Произошла ошибка при подтверждении оплаты. Пожалуйста, попробуйте позже."
+    );
+    await answerCallbackQuery(
+      { callback_query_id: messageId },
+      "Произошла ошибка."
     );
   }
 }

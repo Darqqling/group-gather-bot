@@ -1,58 +1,68 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.23.0";
 
-// Database utilities for the Telegram bot
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://smlqmythgpkucxbaxuob.supabase.co";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+});
 
 /**
- * Save or update a user in the database
+ * Save or update user information in the database.
  */
 export async function saveUser(user: any, supabaseAdmin: any) {
-  if (!user || !user.id) {
-    console.log("Invalid user object:", user);
-    return;
-  }
-  
+  const telegramId = user.id.toString();
+  const username = user.username || null;
+  const firstName = user.first_name || null;
+  const lastName = user.last_name || null;
+  const now = new Date().toISOString();
+
   try {
-    console.log(`Saving user: ${user.first_name} (ID: ${user.id})`);
-    
     const { data, error } = await supabaseAdmin
       .from("telegram_users")
-      .upsert({
-        telegram_id: user.id.toString(),
-        username: user.username || null,
-        first_name: user.first_name || null,
-        last_name: user.last_name || null,
-        last_active_at: new Date().toISOString(),
-        joined_at: new Date().toISOString() // This will only be used for new records
-      }, {
-        onConflict: 'telegram_id'  // Specify the conflict column
-      })
+      .upsert(
+        {
+          telegram_id: telegramId,
+          username: username,
+          first_name: firstName,
+          last_name: lastName,
+          last_active_at: now,
+        },
+        { onConflict: "telegram_id" }
+      )
       .select();
-    
+
     if (error) {
       console.error("Error saving user:", error);
-      throw error;
+    } else {
+      console.log(`User ${user.first_name} (${user.id}) saved/updated.`);
     }
-    
-    console.log("User saved successfully:", data);
-    return data;
   } catch (error) {
-    console.error("Exception saving user:", error);
-    throw error;
+    console.error("Unexpected error saving user:", error);
   }
 }
 
 /**
- * Log errors to the database
+ * Log errors to the database for tracking and debugging.
  */
-export async function logError(error: Error, context: any, supabaseAdmin: any) {
+export async function logError(error: any, context: any, supabaseAdmin: any) {
   try {
-    await supabaseAdmin
+    const { error: dbError } = await supabaseAdmin
       .from("error_logs")
-      .insert({
-        message: `Error processing Telegram webhook: ${error.message}`,
-        stack: error.stack,
-        context: { source: "telegram-webhook", ...context }
-      });
-  } catch (logError) {
-    console.error("Failed to log error:", logError);
+      .insert([
+        {
+          message: error.message || String(error),
+          stack: error.stack,
+          context: context,
+        },
+      ]);
+
+    if (dbError) {
+      console.error("Error logging error to database:", dbError);
+    } else {
+      console.log("Error logged to database.");
+    }
+  } catch (error) {
+    console.error("Failed to log error to database:", error);
   }
 }
