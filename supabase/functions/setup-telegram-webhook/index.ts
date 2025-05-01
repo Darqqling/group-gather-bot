@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.23.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,7 +18,11 @@ serve(async (req) => {
       throw new Error('TELEGRAM_BOT_TOKEN not configured')
     }
 
-    const webhookUrl = 'https://smlqmythgpkucxbaxuob.supabase.co/functions/v1/telegram-webhook'
+    // Get the webhook URL from request body or use default
+    const requestData = await req.json().catch(() => ({}))
+    const webhookUrl = requestData.webhookUrl || 'https://smlqmythgpkucxbaxuob.supabase.co/functions/v1/telegram-webhook'
+    
+    console.log(`Setting webhook to URL: ${webhookUrl}`)
 
     // Set the webhook
     const setWebhookUrl = `https://api.telegram.org/bot${botToken}/setWebhook?url=${webhookUrl}`

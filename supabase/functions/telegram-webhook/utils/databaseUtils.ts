@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.23.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://smlqmythgpkucxbaxuob.supabase.co";
@@ -43,6 +44,65 @@ export async function saveUser(user: any, supabaseAdmin: any) {
 }
 
 /**
+ * Update user state for multi-step commands.
+ */
+export async function updateUserState(
+  telegramId: string,
+  state: string,
+  stateData: any = null,
+  supabaseAdmin: any
+) {
+  try {
+    const { error } = await supabaseAdmin
+      .from("telegram_users")
+      .update({
+        current_state: state,
+        state_data: stateData ? JSON.stringify(stateData) : null,
+        last_active_at: new Date().toISOString(),
+      })
+      .eq("telegram_id", telegramId.toString());
+
+    if (error) {
+      console.error("Error updating user state:", error);
+      return false;
+    }
+
+    console.log(`User ${telegramId} state updated to ${state}`);
+    return true;
+  } catch (error) {
+    console.error("Unexpected error updating user state:", error);
+    return false;
+  }
+}
+
+/**
+ * Clear user state.
+ */
+export async function clearUserState(telegramId: string, supabaseAdmin: any) {
+  try {
+    const { error } = await supabaseAdmin
+      .from("telegram_users")
+      .update({
+        current_state: null,
+        state_data: null,
+        last_active_at: new Date().toISOString(),
+      })
+      .eq("telegram_id", telegramId.toString());
+
+    if (error) {
+      console.error("Error clearing user state:", error);
+      return false;
+    }
+
+    console.log(`User ${telegramId} state cleared`);
+    return true;
+  } catch (error) {
+    console.error("Unexpected error clearing user state:", error);
+    return false;
+  }
+}
+
+/**
  * Log errors to the database for tracking and debugging.
  */
 export async function logError(error: any, context: any, supabaseAdmin: any) {
@@ -64,5 +124,28 @@ export async function logError(error: any, context: any, supabaseAdmin: any) {
     }
   } catch (error) {
     console.error("Failed to log error to database:", error);
+  }
+}
+
+/**
+ * Get user info from database.
+ */
+export async function getUserInfo(telegramId: string, supabaseAdmin: any) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("telegram_users")
+      .select("*")
+      .eq("telegram_id", telegramId.toString())
+      .single();
+
+    if (error) {
+      console.error("Error getting user info:", error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Unexpected error getting user info:", error);
+    return null;
   }
 }

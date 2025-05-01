@@ -1,242 +1,482 @@
-import { sendTelegramMessage, answerCallbackQuery } from "../utils/telegramApi.ts";
+
+// Callback handlers for the Telegram bot
+import { updateUserState, clearUserState } from "../utils/databaseUtils.ts";
 
 /**
- * Handle callback queries from Telegram
+ * Handle callback queries from button presses in the bot interface
  */
-export async function handleCallbackQuery(callbackQuery: any, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any) {
-  if (!callbackQuery || !callbackQuery.data) {
-    console.log("Invalid callback query format or missing data");
-    return;
-  }
-
-  console.log(`Processing callback query from ${callbackQuery.from.first_name} (${callbackQuery.from.id}): ${callbackQuery.data}`);
-
-  const chatId = callbackQuery.message.chat.id;
-  const messageId = callbackQuery.message.message_id;
-  const data = callbackQuery.data;
-
+export async function handleCallbackQuery(
+  callbackQuery: any,
+  sendTelegramMessage: Function,
+  answerCallbackQuery: Function,
+  supabaseAdmin: any
+) {
   try {
-    switch (data) {
-      case "list_collections_to_finish":
-        await handleListCollections(chatId, messageId, 'finish', sendTelegramMessage, answerCallbackQuery, supabaseAdmin, callbackQuery.from.id.toString());
-        break;
-      case "list_collections_to_cancel":
-        await handleListCollections(chatId, messageId, 'cancel', sendTelegramMessage, answerCallbackQuery, supabaseAdmin, callbackQuery.from.id.toString());
-        break;
-      case "list_collections_to_pay":
-        await handleListCollections(chatId, messageId, 'pay', sendTelegramMessage, answerCallbackQuery, supabaseAdmin, callbackQuery.from.id.toString());
-        break;
-      default:
-        if (data.startsWith("finish_collection_")) {
-          const collectionId = data.split("_")[2];
-          await handleFinishCollection(chatId, messageId, collectionId, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
-        } else if (data.startsWith("cancel_collection_")) {
-          const collectionId = data.split("_")[2];
-          await handleCancelCollection(chatId, messageId, collectionId, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
-        } else if (data.startsWith("pay_collection_")) {
-          const collectionId = data.split("_")[2];
-          await handlePayCollection(chatId, messageId, collectionId, sendTelegramMessage, answerCallbackQuery, supabaseAdmin, callbackQuery.from.id.toString());
-        } else {
-          console.log("Unknown callback query data:", data);
-          await answerCallbackQuery(callbackQuery.id, "Неизвестный запрос.");
-        }
-        break;
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+    const callbackData = callbackQuery.data;
+    
+    console.log(`Processing callback from ${callbackQuery.from.id}: ${callbackData}`);
+    
+    // Handle different callback data
+    if (callbackData.startsWith("finish_collection:")) {
+      await handleFinishCollectionCallback(callbackData, chatId, callbackQuery, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+    } 
+    else if (callbackData.startsWith("cancel_collection:")) {
+      await handleCancelCollectionCallback(callbackData, chatId, callbackQuery, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+    }
+    else if (callbackData.startsWith("select_cancel:")) {
+      await handleSelectCancelCallback(callbackData, chatId, callbackQuery, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+    }
+    else if (callbackData === "cancel_operation") {
+      await answerCallbackQuery(callbackQuery.id, "Операция отменена");
+      await sendTelegramMessage(chatId, "Операция отменена.");
+    }
+    else if (callbackData.startsWith("select_payment:")) {
+      await handleSelectPaymentCallback(callbackData, chatId, callbackQuery, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+    }
+    else if (callbackData.startsWith("confirm_payment:")) {
+      await handleConfirmPaymentCallback(callbackData, chatId, callbackQuery, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+    }
+    else if (callbackData.startsWith("admin_")) {
+      await handleAdminCallback(callbackData, chatId, callbackQuery, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+    }
+    else {
+      await answerCallbackQuery(callbackQuery.id, "Неизвестное действие");
+      console.log(`Unknown callback data: ${callbackData}`);
     }
   } catch (error) {
     console.error("Error handling callback query:", error);
-    await sendTelegramMessage(chatId, "Произошла ошибка при обработке запроса.");
-    await answerCallbackQuery(callbackQuery.id, "Произошла ошибка.");
+    await answerCallbackQuery(callbackQuery.id, "Произошла ошибка");
   }
 }
 
-/**
- * Handle listing collections for finish/cancel/pay actions
- */
-async function handleListCollections(chatId: string, messageId: number, action: string, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any, userId: string) {
+async function handleFinishCollectionCallback(
+  callbackData: string,
+  chatId: number,
+  callbackQuery: any,
+  sendTelegramMessage: Function,
+  answerCallbackQuery: Function,
+  supabaseAdmin: any
+) {
   try {
-    // Fetch user collections
-    const { data: collections, error } = await supabaseAdmin
+    const collectionId = callbackData.split(":")[1];
+    
+    // Update collection status
+    const { data, error } = await supabaseAdmin
+      .from("collections")
+      .update({ 
+        status: "finished",
+        last_updated_at: new Date().toISOString()
+      })
+      .eq("id", collectionId)
+      .eq("creator_id", callbackQuery.from.id.toString()) // Ensure user owns this collection
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    await answerCallbackQuery(callbackQuery.id, "Сбор успешно завершен");
+    await sendTelegramMessage(chatId, `✅ Сбор "${data.title}" успешно завершен!`);
+    
+    // Notify all participants
+    // This will be implemented in a separate task for notifications
+  } catch (error) {
+    console.error("Error handling finish collection callback:", error);
+    await answerCallbackQuery(callbackQuery.id, "Произошла ошибка");
+    await sendTelegramMessage(chatId, "Произошла ошибка при завершении сбора. Пожалуйста, попробуйте позже.");
+  }
+}
+
+async function handleSelectCancelCallback(
+  callbackData: string,
+  chatId: number,
+  callbackQuery: any,
+  sendTelegramMessage: Function,
+  answerCallbackQuery: Function,
+  supabaseAdmin: any
+) {
+  try {
+    const collectionId = callbackData.split(":")[1];
+    
+    // Get collection info
+    const { data, error } = await supabaseAdmin
+      .from("collections")
+      .select("title")
+      .eq("id", collectionId)
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    await answerCallbackQuery(callbackQuery.id);
+    
+    // Ask for confirmation
+    await sendTelegramMessage(
+      chatId,
+      `Вы действительно хотите отменить сбор "${data.title}"?`,
+      {
+        reply_markup: JSON.stringify({
+          inline_keyboard: [
+            [
+              { text: "Да, отменить", callback_data: `cancel_collection:${collectionId}` },
+              { text: "Нет", callback_data: "cancel_operation" }
+            ]
+          ]
+        })
+      }
+    );
+  } catch (error) {
+    console.error("Error handling select cancel callback:", error);
+    await answerCallbackQuery(callbackQuery.id, "Произошла ошибка");
+    await sendTelegramMessage(chatId, "Произошла ошибка. Пожалуйста, попробуйте позже.");
+  }
+}
+
+async function handleCancelCollectionCallback(
+  callbackData: string,
+  chatId: number,
+  callbackQuery: any,
+  sendTelegramMessage: Function,
+  answerCallbackQuery: Function,
+  supabaseAdmin: any
+) {
+  try {
+    const collectionId = callbackData.split(":")[1];
+    
+    // Update collection status
+    const { data, error } = await supabaseAdmin
+      .from("collections")
+      .update({ 
+        status: "cancelled",
+        last_updated_at: new Date().toISOString()
+      })
+      .eq("id", collectionId)
+      .eq("creator_id", callbackQuery.from.id.toString()) // Ensure user owns this collection
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    await answerCallbackQuery(callbackQuery.id, "Сбор отменен");
+    await sendTelegramMessage(chatId, `❌ Сбор "${data.title}" отменен.`);
+    
+    // Notify all participants
+    // This will be implemented in a separate task for notifications
+  } catch (error) {
+    console.error("Error handling cancel collection callback:", error);
+    await answerCallbackQuery(callbackQuery.id, "Произошла ошибка");
+    await sendTelegramMessage(chatId, "Произошла ошибка при отмене сбора. Пожалуйста, попробуйте позже.");
+  }
+}
+
+async function handleSelectPaymentCallback(
+  callbackData: string,
+  chatId: number,
+  callbackQuery: any,
+  sendTelegramMessage: Function,
+  answerCallbackQuery: Function,
+  supabaseAdmin: any
+) {
+  try {
+    const collectionId = callbackData.split(":")[1];
+    
+    // Get collection info
+    const { data, error } = await supabaseAdmin
       .from("collections")
       .select("*")
-      .eq("creator_id", userId)
-      .eq("status", 'active')
-      .order("created_at", { ascending: false });
-
+      .eq("id", collectionId)
+      .single();
+    
     if (error) {
       throw error;
     }
+    
+    // Set user state for amount input
+    await updateUserState(
+      callbackQuery.from.id.toString(),
+      "payment_amount",
+      { collection_id: collectionId },
+      supabaseAdmin
+    );
+    
+    await answerCallbackQuery(callbackQuery.id);
+    await sendTelegramMessage(
+      chatId,
+      `Вы выбрали сбор "${data.title}"\n\nЦель: ${data.target_amount} ₽\nСобрано: ${data.current_amount || 0} ₽\n\nПожалуйста, введите сумму оплаты:`
+    );
+  } catch (error) {
+    console.error("Error handling select payment callback:", error);
+    await answerCallbackQuery(callbackQuery.id, "Произошла ошибка");
+    await sendTelegramMessage(chatId, "Произошла ошибка. Пожалуйста, попробуйте позже.");
+  }
+}
 
-    if (!collections || collections.length === 0) {
-      await sendTelegramMessage(
-        chatId,
-        "У вас нет активных сборов."
+async function handleConfirmPaymentCallback(
+  callbackData: string,
+  chatId: number,
+  callbackQuery: any,
+  sendTelegramMessage: Function,
+  answerCallbackQuery: Function,
+  supabaseAdmin: any
+) {
+  try {
+    const parts = callbackData.split(":");
+    const paymentId = parts[1];
+    const action = parts[2]; // confirm or reject
+    
+    if (action === "confirm") {
+      // Update payment status
+      const { data: payment, error } = await supabaseAdmin
+        .from("payments")
+        .update({
+          status: "confirmed",
+          confirmed_at: new Date().toISOString()
+        })
+        .eq("id", paymentId)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update collection amount
+      const { error: updateError } = await supabaseAdmin.rpc(
+        "update_collection_amount", 
+        { 
+          p_collection_id: payment.collection_id, 
+          p_amount: payment.amount 
+        }
       );
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      await answerCallbackQuery(callbackQuery.id, "Платеж подтвержден");
+      await sendTelegramMessage(chatId, `✅ Платеж на сумму ${payment.amount} ₽ подтвержден.`);
+      
+      // Notify the participant
+      const { data: userData } = await supabaseAdmin
+        .from("telegram_users")
+        .select("telegram_id")
+        .eq("id", payment.user_id)
+        .single();
+        
+      if (userData) {
+        await sendTelegramMessage(
+          userData.telegram_id,
+          `✅ Ваш платеж на сумму ${payment.amount} ₽ был подтвержден организатором.`
+        );
+      }
+    } else if (action === "reject") {
+      // Delete the payment
+      const { data: payment, error } = await supabaseAdmin
+        .from("payments")
+        .delete()
+        .eq("id", paymentId)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      await answerCallbackQuery(callbackQuery.id, "Платеж отклонен");
+      await sendTelegramMessage(chatId, `❌ Платеж на сумму ${payment.amount} ₽ отклонен.`);
+      
+      // Notify the participant
+      const { data: userData } = await supabaseAdmin
+        .from("telegram_users")
+        .select("telegram_id")
+        .eq("id", payment.user_id)
+        .single();
+        
+      if (userData) {
+        await sendTelegramMessage(
+          userData.telegram_id,
+          `❌ Ваш платеж на сумму ${payment.amount} ₽ был отклонен организатором.`
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error handling confirm payment callback:", error);
+    await answerCallbackQuery(callbackQuery.id, "Произошла ошибка");
+    await sendTelegramMessage(chatId, "Произошла ошибка при обработке платежа. Пожалуйста, попробуйте позже.");
+  }
+}
+
+async function handleAdminCallback(
+  callbackData: string,
+  chatId: number,
+  callbackQuery: any,
+  sendTelegramMessage: Function,
+  answerCallbackQuery: Function,
+  supabaseAdmin: any
+) {
+  try {
+    const action = callbackData.split("_")[1];
+    
+    // Check if user is an admin
+    const isAdmin = await checkIfAdmin(callbackQuery.from.id.toString(), supabaseAdmin);
+    
+    if (!isAdmin) {
+      await answerCallbackQuery(callbackQuery.id, "У вас нет прав для этого действия");
+      await sendTelegramMessage(chatId, "У вас нет прав для использования этой команды.");
       return;
     }
-
-    let inline_keyboard = [];
-
-    for (const collection of collections) {
-      inline_keyboard.push([{
-        text: collection.title,
-        callback_data: `${action}_collection_${collection.id}`
-      }]);
+    
+    switch (action) {
+      case "maintenance":
+        await handleMaintenanceMode(chatId, callbackQuery, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+        break;
+      case "stats":
+        await handleAdminStats(chatId, callbackQuery, sendTelegramMessage, answerCallbackQuery, supabaseAdmin);
+        break;
+      default:
+        await answerCallbackQuery(callbackQuery.id, "Неизвестное действие");
+        console.log(`Unknown admin action: ${action}`);
     }
-
-    // Add cancel button
-    inline_keyboard.push([{ text: "❌ Отмена", callback_data: "cancel" }]);
-
-    await sendTelegramMessage(
-      chatId,
-      `Выберите сбор, который хотите ${action === 'finish' ? 'завершить' : action === 'cancel' ? 'отменить' : 'подтвердить оплату'}:`,
-      {
-        reply_markup: JSON.stringify({
-          inline_keyboard
-        })
-      }
-    );
-
-    await answerCallbackQuery(
-      { callback_query_id: messageId },
-      "Список сборов получен."
-    );
   } catch (error) {
-    console.error("Error handling list collections:", error);
-    await sendTelegramMessage(
-      chatId,
-      "Произошла ошибка при получении списка сборов. Пожалуйста, попробуйте позже."
-    );
-    await answerCallbackQuery(
-      { callback_query_id: messageId },
-      "Произошла ошибка."
-    );
+    console.error("Error handling admin callback:", error);
+    await answerCallbackQuery(callbackQuery.id, "Произошла ошибка");
+    await sendTelegramMessage(chatId, "Произошла ошибка. Пожалуйста, попробуйте позже.");
   }
 }
 
-/**
- * Handle finishing a collection
- */
-async function handleFinishCollection(chatId: string, messageId: number, collectionId: string, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any) {
+async function handleMaintenanceMode(
+  chatId: number,
+  callbackQuery: any,
+  sendTelegramMessage: Function,
+  answerCallbackQuery: Function,
+  supabaseAdmin: any
+) {
   try {
-    // Update collection status to finished
-    const { error } = await supabaseAdmin
-      .from("collections")
-      .update({ status: 'finished' })
-      .eq("id", collectionId);
-
-    if (error) {
-      throw error;
-    }
-
+    // Get current maintenance status
+    const { data, error } = await supabaseAdmin
+      .from("app_settings")
+      .select("value, description")
+      .eq("key", "maintenance_mode")
+      .single();
+    
+    const isEnabled = data?.value === "true" || data?.value === true;
+    const message = data?.description || "Бот временно находится в режиме обслуживания. Пожалуйста, попробуйте позже.";
+    
+    // Show maintenance settings
+    await answerCallbackQuery(callbackQuery.id);
     await sendTelegramMessage(
       chatId,
-      "Сбор успешно завершен."
-    );
-
-    // Edit the original message to remove the keyboard
-    await sendTelegramMessage(
-      chatId,
-      "Сбор успешно завершен.",
+      `Текущий статус режима обслуживания: ${isEnabled ? "🟢 Включен" : "🔴 Выключен"}\n\nТекущее сообщение:\n${message}`,
       {
         reply_markup: JSON.stringify({
-          remove_keyboard: true
+          inline_keyboard: [
+            [
+              { 
+                text: isEnabled ? "🔴 Выключить" : "🟢 Включить", 
+                callback_data: `admin_toggle_maintenance:${!isEnabled}`
+              }
+            ],
+            [
+              { text: "✏️ Изменить сообщение", callback_data: "admin_edit_maintenance_msg" }
+            ],
+            [
+              { text: "« Назад", callback_data: "admin_back" }
+            ]
+          ]
         })
       }
     );
-
-    await answerCallbackQuery(
-      { callback_query_id: messageId },
-      "Сбор успешно завершен."
-    );
   } catch (error) {
-    console.error("Error handling finish collection:", error);
-    await sendTelegramMessage(
-      chatId,
-      "Произошла ошибка при завершении сбора. Пожалуйста, попробуйте позже."
-    );
-    await answerCallbackQuery(
-      { callback_query_id: messageId },
-      "Произошла ошибка."
-    );
+    console.error("Error handling maintenance mode:", error);
+    await sendTelegramMessage(chatId, "Произошла ошибка при получении настроек режима обслуживания.");
   }
 }
 
-/**
- * Handle cancelling a collection
- */
-async function handleCancelCollection(chatId: string, messageId: number, collectionId: string, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any) {
+async function handleAdminStats(
+  chatId: number,
+  callbackQuery: any,
+  sendTelegramMessage: Function,
+  answerCallbackQuery: Function,
+  supabaseAdmin: any
+) {
   try {
-    // Update collection status to cancelled
-    const { error } = await supabaseAdmin
-      .from("collections")
-      .update({ status: 'cancelled' })
-      .eq("id", collectionId);
-
-    if (error) {
-      throw error;
-    }
-
-   // Edit the original message to remove the keyboard
+    // Get statistics
+    const [users, collections, payments] = await Promise.all([
+      supabaseAdmin.from("telegram_users").select("*", { count: "exact", head: true }),
+      supabaseAdmin.from("collections").select("status"),
+      supabaseAdmin.from("payments").select("amount, status")
+    ]);
+    
+    const activeCollections = collections.data.filter(c => c.status === "active").length;
+    const finishedCollections = collections.data.filter(c => c.status === "finished").length;
+    const cancelledCollections = collections.data.filter(c => c.status === "cancelled").length;
+    
+    const pendingPayments = payments.data.filter(p => p.status === "pending").length;
+    const confirmedPayments = payments.data.filter(p => p.status === "confirmed").length;
+    
+    const totalAmount = payments.data
+      .filter(p => p.status === "confirmed")
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const statsMessage = 
+      "📊 *Статистика бота*\n\n" +
+      `👥 Пользователей: ${users.count || 0}\n\n` +
+      "🗂 *Сборы:*\n" +
+      `▫️ Активных: ${activeCollections}\n` +
+      `▫️ Завершенных: ${finishedCollections}\n` +
+      `▫️ Отмененных: ${cancelledCollections}\n\n` +
+      "💰 *Платежи:*\n" +
+      `▫️ Ожидающих подтверждения: ${pendingPayments}\n` +
+      `▫️ Подтвержденных: ${confirmedPayments}\n` +
+      `▫️ Общая сумма: ${totalAmount} ₽`;
+    
+    await answerCallbackQuery(callbackQuery.id);
     await sendTelegramMessage(
       chatId,
-      "Сбор отменен.",
+      statsMessage,
       {
+        parse_mode: "Markdown",
         reply_markup: JSON.stringify({
-          remove_keyboard: true
+          inline_keyboard: [
+            [
+              { text: "« Назад", callback_data: "admin_back" }
+            ]
+          ]
         })
       }
     );
-
-    await answerCallbackQuery(
-      { callback_query_id: messageId },
-      "Сбор успешно отменен."
-    );
   } catch (error) {
-    console.error("Error handling cancel collection:", error);
-    await sendTelegramMessage(
-      chatId,
-      "Произошла ошибка при отмене сбора. Пожалуйста, попробуйте позже."
-    );
-    await answerCallbackQuery(
-      { callback_query_id: messageId },
-      "Произошла ошибка."
-    );
+    console.error("Error handling admin stats:", error);
+    await sendTelegramMessage(chatId, "Произошла ошибка при получении статистики.");
   }
 }
 
-/**
- * Handle paying for a collection
- */
-async function handlePayCollection(chatId: string, messageId: number, collectionId: string, sendTelegramMessage: Function, answerCallbackQuery: Function, supabaseAdmin: any, userId: string) {
+// Utility to check if user is an admin (placeholder)
+async function checkIfAdmin(telegramId: string, supabaseAdmin: any): Promise<boolean> {
+  // This is a placeholder. In a real application, you would check against a list of admin IDs
+  // or a flag in your database
+  const { data, error } = await supabaseAdmin
+    .from("app_settings")
+    .select("value")
+    .eq("key", "admin_telegram_ids")
+    .single();
+    
+  if (error || !data) {
+    console.error("Error checking admin status:", error);
+    return false;
+  }
+  
   try {
-    // Ask the user to enter the amount they want to pay
-    await sendTelegramMessage(
-      chatId,
-      "Введите сумму, которую вы хотите внести:"
-    );
-
-    // Update user state in database to indicate they're entering payment amount
-    await supabaseAdmin
-      .from("telegram_users")
-      .update({
-        current_state: "entering_payment_amount",
-        state_data: JSON.stringify({ collection_id: collectionId })
-      })
-      .eq("telegram_id", userId);
-
-    await answerCallbackQuery(
-      { callback_query_id: messageId },
-      "Ожидаю сумму оплаты."
-    );
-  } catch (error) {
-    console.error("Error handling pay collection:", error);
-    await sendTelegramMessage(
-      chatId,
-      "Произошла ошибка при подтверждении оплаты. Пожалуйста, попробуйте позже."
-    );
-    await answerCallbackQuery(
-      { callback_query_id: messageId },
-      "Произошла ошибка."
-    );
+    const adminIds = JSON.parse(data.value);
+    return Array.isArray(adminIds) && adminIds.includes(telegramId);
+  } catch (e) {
+    console.error("Error parsing admin IDs:", e);
+    return false;
   }
 }

@@ -5,6 +5,7 @@ import { handleMessage } from "./handlers/messageHandlers.ts";
 import { handleCallbackQuery } from "./handlers/callbackHandlers.ts";
 import { sendTelegramMessage, answerCallbackQuery } from "./utils/telegramApi.ts";
 import { saveUser, logError } from "./utils/databaseUtils.ts";
+import { isMaintenanceModeEnabled, getMaintenanceMessage } from "./utils/maintenanceMode.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,6 +45,44 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
       );
+    }
+
+    // Store user information if present
+    if (update.message?.from) {
+      await saveUser(update.message.from, supabaseAdmin);
+    } else if (update.callback_query?.from) {
+      await saveUser(update.callback_query.from, supabaseAdmin);
+    }
+    
+    // Check if maintenance mode is enabled
+    const maintenanceEnabled = await isMaintenanceModeEnabled();
+    
+    // Handle maintenance mode
+    if (maintenanceEnabled) {
+      // Process special admin commands even during maintenance
+      const isAdminOverride = 
+        update.message?.text?.startsWith("/admin") || 
+        update.callback_query?.data?.startsWith("admin_");
+      
+      if (!isAdminOverride) {
+        const maintenanceMessage = await getMaintenanceMessage();
+        
+        if (update.message) {
+          await sendTelegramMessage(update.message.chat.id, maintenanceMessage);
+        } else if (update.callback_query) {
+          await answerCallbackQuery(update.callback_query.id, "Режим обслуживания активен");
+          await sendTelegramMessage(update.callback_query.message.chat.id, maintenanceMessage);
+        }
+        
+        // Always respond with success to Telegram
+        return new Response(
+          JSON.stringify({ success: true, maintenance: true }),
+          { 
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
+      }
     }
 
     // Process different types of updates
