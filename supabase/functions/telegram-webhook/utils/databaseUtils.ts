@@ -133,3 +133,118 @@ export async function isUserAdmin(userId: string, supabaseAdmin: any) {
     return false;
   }
 }
+
+/**
+ * Get collection by ID
+ */
+export async function getCollectionById(collectionId: string, supabaseAdmin: any) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("collections")
+      .select(`
+        id, 
+        title, 
+        description, 
+        creator_id, 
+        target_amount, 
+        current_amount, 
+        status, 
+        deadline,
+        telegram_users!collections_creator_id_fkey (
+          telegram_id,
+          first_name,
+          last_name,
+          username
+        )
+      `)
+      .eq("id", collectionId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Error fetching collection:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Exception fetching collection:", error);
+    return null;
+  }
+}
+
+/**
+ * Get user collections
+ */
+export async function getUserCollections(userId: string, status: string | null, supabaseAdmin: any) {
+  try {
+    let query = supabaseAdmin
+      .from("collections")
+      .select(`
+        id, 
+        title, 
+        description, 
+        creator_id, 
+        target_amount, 
+        current_amount, 
+        status, 
+        deadline,
+        telegram_users!collections_creator_id_fkey (
+          telegram_id,
+          first_name,
+          last_name,
+          username
+        )
+      `)
+      .eq("telegram_users.telegram_id", userId);
+    
+    if (status) {
+      query = query.eq("status", status);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error("Error fetching user collections:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Exception fetching user collections:", error);
+    return null;
+  }
+}
+
+/**
+ * Get collection payments
+ */
+export async function getCollectionPayments(collectionId: string, supabaseAdmin: any) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("payments")
+      .select(`
+        id, 
+        amount, 
+        status, 
+        created_at, 
+        confirmed_at,
+        telegram_users!payments_user_id_fkey (
+          telegram_id,
+          first_name,
+          last_name,
+          username
+        )
+      `)
+      .eq("collection_id", collectionId);
+    
+    if (error) {
+      console.error("Error fetching collection payments:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Exception fetching collection payments:", error);
+    return null;
+  }
+}

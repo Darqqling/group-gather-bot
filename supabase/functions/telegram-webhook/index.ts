@@ -27,13 +27,19 @@ async function getBotToken() {
       .from('app_secrets')
       .select('value')
       .eq('key', 'TELEGRAM_BOT_TOKEN')
-      .single();
+      .maybeSingle();
       
-    if (error || !data) {
+    if (error) {
       console.error("Error retrieving bot token from database:", error);
       return null;
     }
     
+    if (!data || !data.value) {
+      console.error("Bot token not found in database");
+      return null;
+    }
+    
+    console.log(`Retrieved bot token: ${data.value.substring(0, 5)}...${data.value.substring(data.value.length - 5)}`);
     return data.value;
   } catch (error) {
     console.error("Exception retrieving bot token:", error);
@@ -48,7 +54,7 @@ async function isMaintenanceMode() {
       .from('app_settings')
       .select('value')
       .eq('key', 'maintenance_mode')
-      .single();
+      .maybeSingle();
     
     if (error) {
       console.error("Error checking maintenance mode:", error);
@@ -69,7 +75,7 @@ async function getMaintenanceMessage() {
       .from('app_settings')
       .select('value')
       .eq('key', 'maintenance_message')
-      .single();
+      .maybeSingle();
     
     if (error || !data) {
       return "Сервис временно недоступен. Пожалуйста, попробуйте позже.";
@@ -105,11 +111,21 @@ serve(async (req) => {
       );
     }
     
-    console.log(`Bot token is configured: ${TELEGRAM_BOT_TOKEN.substring(0, 3)}...${TELEGRAM_BOT_TOKEN.substring(TELEGRAM_BOT_TOKEN.length - 3)}`);
-
     // Process the Telegram update
-    const update = await req.json();
-    console.log("Received update:", JSON.stringify(update));
+    let update;
+    try {
+      update = await req.json();
+      console.log("Received update:", JSON.stringify(update));
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError);
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid JSON payload" }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
 
     // Basic validation to ensure this is a Telegram webhook
     if (!update || !update.update_id) {

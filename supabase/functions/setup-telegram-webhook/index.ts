@@ -30,26 +30,29 @@ serve(async (req) => {
       .from('app_secrets')
       .select('value')
       .eq('key', 'TELEGRAM_BOT_TOKEN')
-      .single();
+      .maybeSingle();
       
-    if (secretError || !secretData) {
-      throw new Error('Failed to retrieve Telegram bot token from database');
+    if (secretError) {
+      console.error("Error retrieving token:", secretError);
+      throw new Error('Failed to retrieve Telegram bot token from database: ' + secretError.message);
+    }
+    
+    if (!secretData || !secretData.value) {
+      throw new Error('TELEGRAM_BOT_TOKEN is not configured in database');
     }
     
     const botToken = secretData.value;
     
-    if (!botToken) {
-      throw new Error('TELEGRAM_BOT_TOKEN is not configured in database');
-    }
+    console.log(`Using bot token: ${botToken.substring(0, 5)}...${botToken.substring(botToken.length - 5)}`);
 
     // Parse the request body to determine the action
     let action = 'set'; // Default action
     let requestBody = {};
     
     try {
-      const text = await req.text();
-      if (text && text.trim().length > 0) {
-        requestBody = JSON.parse(text);
+      const bodyText = await req.text();
+      if (bodyText && bodyText.trim().length > 0) {
+        requestBody = JSON.parse(bodyText);
         if (requestBody.action) {
           action = requestBody.action;
         }
@@ -58,13 +61,13 @@ serve(async (req) => {
       console.log('No valid JSON in request body or empty body, using default action');
     }
     
+    console.log(`Action: ${action}`);
+    
     // Default webhook URL - get from environment or use hardcoded value
     const webhookBaseUrl = Deno.env.get('WEBHOOK_BASE_URL') || 'https://smlqmythgpkucxbaxuob.supabase.co';
     const webhookUrl = `${webhookBaseUrl}/functions/v1/telegram-webhook`;
     
     console.log(`Using webhook URL: ${webhookUrl}`);
-    console.log(`Action: ${action}`);
-    console.log(`Using bot token: ${botToken.substring(0, 5)}...${botToken.substring(botToken.length - 5)}`); // Logging part of token for debugging
     
     // Handle different actions
     if (action === 'set' || !action) {

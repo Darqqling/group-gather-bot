@@ -71,11 +71,9 @@ serve(async (req) => {
       );
     }
 
-    console.log("Saving token to environment...");
+    console.log("Saving token to database...");
     
-    // Update the token directly
-    // Since supabaseAdmin.functions.setSecret is not available/working,
-    // we'll store it in the database app_settings table instead
+    // Update the token in app_secrets table
     const { error } = await supabaseAdmin
       .from('app_secrets')
       .upsert({
@@ -88,7 +86,7 @@ serve(async (req) => {
     
     if (error) {
       console.error('Error setting Telegram token:', error);
-      throw new Error('Failed to update Telegram token in database');
+      throw new Error(`Failed to update Telegram token in database: ${error.message}`);
     }
 
     console.log("Telegram token has been updated successfully");

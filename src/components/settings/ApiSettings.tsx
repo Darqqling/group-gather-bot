@@ -111,6 +111,8 @@ const ApiSettings = () => {
           key: TELEGRAM_TOKEN_SETTING_KEY,
           value: displayValue,
           description: 'Display value for Telegram bot token (not the actual token)'
+        }, {
+          onConflict: 'key' // Added this line to handle conflict on key
         });
       
       if (dbError) throw dbError;
@@ -182,7 +184,7 @@ const ApiSettings = () => {
             <Input
               id="telegram-api"
               type={isShowingToken ? "text" : "password"}
-              placeholder="Your Telegram Bot Token (e.g., 123456789:ABCDefGhIJKlmNoPQRsTUVwxyZ)"
+              placeholder="Your Telegram Bot Token (e.g., 123456789:ABCDefGhIJKlmNoPQRSTUVwxyZ)"
               value={telegramToken}
               onChange={(e) => setTelegramToken(e.target.value)}
               disabled={isLoading}
