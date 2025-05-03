@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.23.0";
-// Note: We're importing directly from the webhook handlers directory, so we need to use relative paths correctly
 import { handleMessage } from "../telegram-webhook/handlers/messageHandlers.ts";
 import { handleCallbackQuery } from "../telegram-webhook/handlers/callbackHandlers.ts";
 import { sendTelegramMessage, answerCallbackQuery } from "../telegram-webhook/utils/telegramApi.ts";
@@ -88,12 +87,14 @@ async function getMaintenanceMessage() {
 }
 
 // Get updates from Telegram (long polling)
-async function getUpdates(token: string, offset = 0) {
+// Following official Telegram API docs: https://core.telegram.org/bots/api#getupdates
+async function getUpdates(token: string, offset = 0, timeout = 30) {
   try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=30`,
-      { method: "GET" }
-    );
+    // Using timeout parameter as recommended in the docs for long polling
+    const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=${timeout}`;
+    console.log(`Requesting updates with offset ${offset}`);
+    
+    const response = await fetch(url, { method: "GET" });
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -162,10 +163,24 @@ serve(async (req) => {
   }
 
   try {
-    // Get request parameters
-    const params = new URL(req.url).searchParams;
-    const action = params.get('action') || 'check';
-    const reset = params.get('reset') === 'true';
+    // Parse request parameters from URL or body
+    const url = new URL(req.url);
+    const params = url.searchParams;
+    let action = params.get('action');
+    let reset = params.get('reset') === 'true';
+    
+    // If parameters weren't in the URL, try to get them from the body
+    if (!action && !reset) {
+      try {
+        const body = await req.json();
+        action = body.action;
+        reset = body.reset === 'true';
+      } catch (e) {
+        // If body parsing fails, use default values
+        action = 'check';
+        reset = false;
+      }
+    }
     
     // If reset is requested, reset the last update ID
     if (reset) {
@@ -211,10 +226,11 @@ serve(async (req) => {
     if (action === 'process') {
       await processUpdates(updates.result, token, maintenanceMode);
       
-      // Update lastUpdateId to avoid processing the same updates again
+      // Update lastUpdateId to be the highest update_id + 1, as per Telegram docs
       if (updates.result.length > 0) {
         const maxUpdateId = Math.max(...updates.result.map(u => u.update_id));
         lastUpdateId = maxUpdateId + 1;
+        console.log(`New lastUpdateId: ${lastUpdateId}`);
       }
     }
 

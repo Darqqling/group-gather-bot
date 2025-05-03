@@ -54,7 +54,7 @@ export const stopPolling = () => {
 export const resetPolling = async (): Promise<boolean> => {
   try {
     const { data, error } = await supabase.functions.invoke('telegram-polling', {
-      body: { reset: 'true' },
+      body: { reset: true },
       method: 'GET'
     });
     
