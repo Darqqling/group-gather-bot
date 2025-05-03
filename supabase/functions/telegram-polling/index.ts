@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.23.0";
+// Note: We're importing directly from the webhook handlers directory, so we need to use relative paths correctly
 import { handleMessage } from "../telegram-webhook/handlers/messageHandlers.ts";
 import { handleCallbackQuery } from "../telegram-webhook/handlers/callbackHandlers.ts";
 import { sendTelegramMessage, answerCallbackQuery } from "../telegram-webhook/utils/telegramApi.ts";

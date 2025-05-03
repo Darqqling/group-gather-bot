@@ -5,7 +5,7 @@ import PollingStatus from "./PollingStatus";
 const WebhookStatus = () => {
   return (
     <Alert>
-      <AlertTitle>Статус опроса Telegram</AlertTitle>
+      <AlertTitle>Статус Long Polling для Telegram</AlertTitle>
       <AlertDescription>
         <div className="mt-2 space-y-1">
           <PollingStatus />

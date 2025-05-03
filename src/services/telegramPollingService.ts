@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 const DEFAULT_POLLING_INTERVAL = 5000;
 
 // Store for the polling interval
-let pollingInterval: number | null = null;
+let pollingInterval: ReturnType<typeof setInterval> | null = null;
 let isPolling = false;
 
 /**
@@ -54,8 +54,8 @@ export const stopPolling = () => {
 export const resetPolling = async (): Promise<boolean> => {
   try {
     const { data, error } = await supabase.functions.invoke('telegram-polling', {
-      method: 'GET',
-      queryParams: { reset: 'true' }
+      body: { reset: 'true' },
+      method: 'GET'
     });
     
     if (error) {
@@ -84,8 +84,8 @@ export const isPollingActive = (): boolean => {
 async function pollUpdates() {
   try {
     const { data, error } = await supabase.functions.invoke('telegram-polling', {
-      method: 'GET',
-      queryParams: { action: 'process' }
+      body: { action: 'process' },
+      method: 'GET'
     });
     
     if (error) {

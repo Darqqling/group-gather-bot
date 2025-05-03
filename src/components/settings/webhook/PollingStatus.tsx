@@ -33,7 +33,7 @@ const PollingStatus = () => {
     <div className="flex items-center space-x-2">
       <span>Статус:</span>
       {active ? (
-        <Badge variant="success" className="bg-green-500">
+        <Badge variant="default" className="bg-green-500">
           Активно
         </Badge>
       ) : (
