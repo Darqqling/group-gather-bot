@@ -13,19 +13,34 @@ We resolved several critical issues with the Telegram bot integration:
 2. Updated the edge functions (`update-telegram-token`, `setup-telegram-webhook`, `telegram-webhook`) to properly retrieve the token from the database
 3. Fixed UI components to handle token updates and webhook configuration
 4. Resolved issues with token storage and retrieval using proper upsert operations with conflict handling
+5. Implemented full conversation flow for bot commands according to test dialogues
 
 These changes enable the bot to successfully:
 - Register with the Telegram API
 - Receive and respond to basic commands
 - Process user interactions
+- Create, manage and track collections through conversation flows
 
-## Known limitations
+## Supported Bot Commands
 
-The bot currently has some functional limitations that need to be addressed:
+The bot now supports the following commands:
 
-1. New collection creation flow is incomplete - the bot doesn't properly handle the input of collection names after the `/new` command
-2. Command naming inconsistencies between the admin interface and bot implementation
-3. Some callback queries may cause errors due to improper UUID validation
+1. `/start` - Introduction message with available commands
+2. `/new` - Start creating a new collection (walks through name, description, amount, deadline)
+3. `/finish` - Select and finish an active collection
+4. `/cancel` - Select and cancel an active collection
+5. `/paid` - Record a payment for an active collection
+6. `/history` - View past and current collections
+7. `/help` - Display available commands
+
+## Conversation Flows
+
+The bot supports complete conversation flows for:
+
+1. Creating a new collection (name → description → amount → deadline)
+2. Selecting collections to finish, cancel or make payments to
+3. Confirming actions before executing them
+4. Handling error cases with user-friendly messages
 
 ## How to use the bot
 
