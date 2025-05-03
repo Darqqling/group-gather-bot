@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.23.0";
 import { handleMessage } from "./handlers/messageHandlers.ts";
 import { handleCallbackQuery } from "./handlers/callbackHandlers.ts";
 import { sendTelegramMessage, answerCallbackQuery } from "./utils/telegramApi.ts";
-import { saveUser, logError } from "./utils/databaseUtils.ts";
+import { saveUser, logError, getUserState, updateUserState } from "./utils/databaseUtils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -140,9 +140,9 @@ serve(async (req) => {
         // Regular message handling
         await handleMessage(
           update.message, 
-          (user) => saveUser(user, supabaseAdmin),
-          (chatId, text, options) => sendTelegramMessage(chatId, text, { ...options, token: TELEGRAM_BOT_TOKEN }),
-          supabaseAdmin
+          supabaseAdmin,
+          (chatId: number | string, text: string, options = {}) => 
+            sendTelegramMessage(chatId, text, { ...options, token: TELEGRAM_BOT_TOKEN })
         );
       }
     } else if (update.callback_query) {
@@ -155,9 +155,11 @@ serve(async (req) => {
         // Regular callback query handling
         await handleCallbackQuery(
           update.callback_query,
-          (chatId, text, options) => sendTelegramMessage(chatId, text, { ...options, token: TELEGRAM_BOT_TOKEN }),
-          (callbackQueryId, text, options) => answerCallbackQuery(callbackQueryId, text, { ...options, token: TELEGRAM_BOT_TOKEN }),
-          supabaseAdmin
+          supabaseAdmin,
+          (chatId: number | string, text: string, options = {}) => 
+            sendTelegramMessage(chatId, text, { ...options, token: TELEGRAM_BOT_TOKEN }),
+          (callbackQueryId: string, text = "", options = {}) => 
+            answerCallbackQuery(callbackQueryId, text, { ...options, token: TELEGRAM_BOT_TOKEN })
         );
       }
     }

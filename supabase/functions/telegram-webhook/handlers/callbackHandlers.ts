@@ -1,15 +1,19 @@
 
 // Handlers for Telegram callback queries
-import { updateCollectionStatus, getCollectionById, recordPayment } from "../utils/collectionUtils.ts";
+import { 
+  updateCollectionStatus, 
+  getCollectionById, 
+  updateUserState
+} from "../utils/databaseUtils.ts";
 
 /**
  * Handle callback queries from Telegram inline keyboards
  */
 export async function handleCallbackQuery(
-  callbackQuery: any, 
+  callbackQuery: any,
+  supabaseAdmin: any,
   sendTelegramMessage: Function,
-  answerCallbackQuery: Function,
-  supabaseAdmin: any
+  answerCallbackQuery: Function
 ) {
   if (!callbackQuery || !callbackQuery.data) {
     console.log("Invalid callback query format or missing data");
@@ -167,18 +171,12 @@ export async function handleCallbackQuery(
       const collectionId = data.replace("paid_confirm_", "");
       
       // Store collection ID in user state for amount input
-      await supabaseAdmin
-        .from("telegram_users")
-        .update({ 
-          current_state: "payment_amount",
-          state_data: JSON.stringify({ collection_id: collectionId })
-        })
-        .eq("telegram_id", userId);
+      await updateUserState(userId, "payment_amount", { collection_id: collectionId }, supabaseAdmin);
       
       await answerCallbackQuery(callbackQuery.id);
       await sendTelegramMessage(
         callbackQuery.message.chat.id,
-        "Введите сумму вашего взноса"
+        "Введите сумму вашего взноса:"
       );
     }
     // Process payment selection

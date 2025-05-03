@@ -56,3 +56,80 @@ export async function logError(error: Error, context: any, supabaseAdmin: any) {
     console.error("Failed to log error:", logError);
   }
 }
+
+/**
+ * Get user state from database
+ */
+export async function getUserState(userId: string, supabaseAdmin: any) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("telegram_users")
+      .select("current_state, state_data")
+      .eq("telegram_id", userId)
+      .single();
+    
+    if (error) {
+      console.error("Error fetching user state:", error);
+      return null;
+    }
+    
+    return {
+      state: data.current_state,
+      data: data.state_data ? JSON.parse(data.state_data) : null
+    };
+  } catch (error) {
+    console.error("Exception fetching user state:", error);
+    return null;
+  }
+}
+
+/**
+ * Update user state
+ */
+export async function updateUserState(userId: string, state: string | null, stateData: any | null, supabaseAdmin: any) {
+  try {
+    const update: any = { current_state: state };
+    
+    if (stateData !== undefined) {
+      update.state_data = stateData ? JSON.stringify(stateData) : null;
+    }
+    
+    const { error } = await supabaseAdmin
+      .from("telegram_users")
+      .update(update)
+      .eq("telegram_id", userId);
+    
+    if (error) {
+      console.error("Error updating user state:", error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Exception updating user state:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if user is admin
+ */
+export async function isUserAdmin(userId: string, supabaseAdmin: any) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "admin_users")
+      .single();
+    
+    if (error || !data) {
+      return false;
+    }
+    
+    const adminUsers = data.value.split(',').map((id: string) => id.trim());
+    return adminUsers.includes(userId);
+  } catch (error) {
+    console.error("Exception checking admin status:", error);
+    return false;
+  }
+}
