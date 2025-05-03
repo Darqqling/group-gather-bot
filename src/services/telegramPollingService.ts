@@ -20,7 +20,14 @@ export const startPolling = async (callback?: () => void, interval = DEFAULT_POL
   console.log(`Starting Telegram polling with interval ${interval}ms`);
   
   // First, ensure any webhooks are deleted
-  await deleteWebhook();
+  const webhookDeleted = await deleteWebhook();
+  console.log("Webhook deletion result:", webhookDeleted);
+  
+  // Only start polling if webhook was deleted successfully
+  if (!webhookDeleted.success) {
+    console.error("Failed to delete webhook before starting polling");
+    return;
+  }
   
   isPolling = true;
   
@@ -57,7 +64,8 @@ export const stopPolling = () => {
 export const resetPolling = async (): Promise<boolean> => {
   try {
     const { data, error } = await supabase.functions.invoke('telegram-polling', {
-      body: { reset: true },
+      method: 'POST',
+      body: { action: 'reset' },
     });
     
     if (error) {
@@ -76,23 +84,24 @@ export const resetPolling = async (): Promise<boolean> => {
 /**
  * Explicitly delete any existing webhook
  */
-export const deleteWebhook = async (): Promise<boolean> => {
+export const deleteWebhook = async (): Promise<{success: boolean, result?: any, error?: string}> => {
   try {
     // Use the telegram-polling function to delete any webhook
     const { data, error } = await supabase.functions.invoke('telegram-polling', {
+      method: 'POST',
       body: { action: 'deleteWebhook' },
     });
     
     if (error) {
       console.error("Error deleting webhook:", error);
-      return false;
+      return { success: false, error: error.message };
     }
     
     console.log("Webhook deletion result:", data);
-    return data?.success === true;
-  } catch (error) {
+    return { success: data?.success === true, result: data };
+  } catch (error: any) {
     console.error("Exception deleting webhook:", error);
-    return false;
+    return { success: false, error: error.message };
   }
 };
 
@@ -109,6 +118,7 @@ export const isPollingActive = (): boolean => {
 async function pollUpdates() {
   try {
     const { data, error } = await supabase.functions.invoke('telegram-polling', {
+      method: 'POST',
       body: { action: 'process' },
     });
     

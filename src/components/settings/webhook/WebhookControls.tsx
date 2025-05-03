@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { RefreshCwIcon, PlayIcon, PauseIcon } from "lucide-react";
-import { isPollingActive, startPolling, stopPolling, resetPolling, deleteWebhook } from "@/services/telegramPollingService";
+import { isPollingActive, startPolling, stopPolling, resetPolling } from "@/services/telegramPollingService";
 import { useState, useEffect } from "react";
 
 interface WebhookControlsProps {
@@ -29,9 +29,7 @@ const WebhookControls = ({
   }, []);
 
   const handleStartPolling = async () => {
-    // Delete any existing webhooks before starting polling
-    await deleteWebhook();
-    await startPolling();
+    const result = await startPolling();
     setIsActive(true);
   };
 
