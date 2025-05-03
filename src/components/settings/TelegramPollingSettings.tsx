@@ -7,7 +7,7 @@ import WebhookControls from "./webhook/WebhookControls";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InfoIcon } from "lucide-react";
 
-const WebhookSettings = () => {
+const TelegramPollingSettings = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,4 +69,4 @@ const WebhookSettings = () => {
   );
 };
 
-export default WebhookSettings;
+export default TelegramPollingSettings;

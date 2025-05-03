@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.23.0";
 import { handleMessage } from "./handlers/messageHandlers.ts";
@@ -83,6 +82,22 @@ async function getMaintenanceMessage() {
     return data.value;
   } catch (error) {
     return "Сервис временно недоступен. Пожалуйста, попробуйте позже.";
+  }
+}
+
+// Delete any existing webhooks
+async function deleteWebhook(token: string) {
+  try {
+    const url = `https://api.telegram.org/bot${token}/deleteWebhook`;
+    const response = await fetch(url);
+    const result = await response.json();
+    
+    console.log("Delete webhook result:", result);
+    
+    return { success: result.ok, result };
+  } catch (error) {
+    console.error("Error deleting webhook:", error);
+    return { success: false, error: error.message };
   }
 }
 

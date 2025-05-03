@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { RefreshCwIcon, PlayIcon, PauseIcon } from "lucide-react";
-import { isPollingActive, startPolling, stopPolling, resetPolling } from "@/services/telegramPollingService";
+import { isPollingActive, startPolling, stopPolling, resetPolling, deleteWebhook } from "@/services/telegramPollingService";
 import { useState, useEffect } from "react";
 
 interface WebhookControlsProps {
@@ -28,8 +28,10 @@ const WebhookControls = ({
     return () => clearInterval(interval);
   }, []);
 
-  const handleStartPolling = () => {
-    startPolling();
+  const handleStartPolling = async () => {
+    // Delete any existing webhooks before starting polling
+    await deleteWebhook();
+    await startPolling();
     setIsActive(true);
   };
 
@@ -80,7 +82,7 @@ const WebhookControls = ({
       </div>
       <div className="flex justify-between mt-4">
         <Button onClick={onSave} disabled={isLoading || isSaving}>
-          {isSaving ? "Сохранение..." : "Сохранить токен"}
+          {isSaving ? "Сохранение..." : "Сохранить настройки"}
         </Button>
       </div>
     </>

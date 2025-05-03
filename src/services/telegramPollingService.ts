@@ -11,13 +11,17 @@ let isPolling = false;
 /**
  * Start polling for Telegram updates
  */
-export const startPolling = (callback?: () => void, interval = DEFAULT_POLLING_INTERVAL) => {
+export const startPolling = async (callback?: () => void, interval = DEFAULT_POLLING_INTERVAL) => {
   if (isPolling) {
     console.log("Polling already active");
     return;
   }
   
   console.log(`Starting Telegram polling with interval ${interval}ms`);
+  
+  // First, ensure any webhooks are deleted
+  await deleteWebhook();
+  
   isPolling = true;
   
   // Clear any existing interval
@@ -26,7 +30,7 @@ export const startPolling = (callback?: () => void, interval = DEFAULT_POLLING_I
   }
   
   // Initial poll
-  pollUpdates();
+  await pollUpdates();
   
   // Set interval for subsequent polls
   pollingInterval = setInterval(async () => {
@@ -54,7 +58,6 @@ export const resetPolling = async (): Promise<boolean> => {
   try {
     const { data, error } = await supabase.functions.invoke('telegram-polling', {
       body: { reset: true },
-      method: 'GET'
     });
     
     if (error) {
@@ -66,6 +69,29 @@ export const resetPolling = async (): Promise<boolean> => {
     return data?.success === true;
   } catch (error) {
     console.error("Exception resetting polling:", error);
+    return false;
+  }
+};
+
+/**
+ * Explicitly delete any existing webhook
+ */
+export const deleteWebhook = async (): Promise<boolean> => {
+  try {
+    // Use the telegram-polling function to delete any webhook
+    const { data, error } = await supabase.functions.invoke('telegram-polling', {
+      body: { action: 'deleteWebhook' },
+    });
+    
+    if (error) {
+      console.error("Error deleting webhook:", error);
+      return false;
+    }
+    
+    console.log("Webhook deletion result:", data);
+    return data?.success === true;
+  } catch (error) {
+    console.error("Exception deleting webhook:", error);
     return false;
   }
 };
@@ -84,7 +110,6 @@ async function pollUpdates() {
   try {
     const { data, error } = await supabase.functions.invoke('telegram-polling', {
       body: { action: 'process' },
-      method: 'GET'
     });
     
     if (error) {
@@ -92,11 +117,11 @@ async function pollUpdates() {
       return false;
     }
     
-    if (data.updates > 0) {
+    if (data && data.updates > 0) {
       console.log(`Processed ${data.updates} updates, new lastUpdateId: ${data.lastUpdateId}`);
     }
     
-    return data.success;
+    return data?.success;
   } catch (error) {
     console.error("Exception polling updates:", error);
     return false;
