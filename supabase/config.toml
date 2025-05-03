@@ -40,6 +40,5 @@ enabled = true
 
 [edge_functions]
 [edge_functions.update-telegram-token]
-[edge_functions.setup-telegram-webhook]
-[edge_functions.telegram-webhook]
 [edge_functions.telegram-polling]
+

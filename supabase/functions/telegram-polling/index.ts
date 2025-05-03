@@ -1,10 +1,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.23.0";
-import { handleMessage } from "../telegram-webhook/handlers/messageHandlers.ts";
-import { handleCallbackQuery } from "../telegram-webhook/handlers/callbackHandlers.ts";
-import { sendTelegramMessage, answerCallbackQuery } from "../telegram-webhook/utils/telegramApi.ts";
-import { logError } from "../telegram-webhook/utils/databaseUtils.ts";
+import { handleMessage } from "./handlers/messageHandlers.ts";
+import { handleCallbackQuery } from "./handlers/callbackHandlers.ts";
+import { sendTelegramMessage, answerCallbackQuery } from "./utils/telegramApi.ts";
+import { logError } from "./utils/databaseUtils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -174,7 +174,7 @@ serve(async (req) => {
       try {
         const body = await req.json();
         action = body.action;
-        reset = body.reset === 'true';
+        reset = body.reset === true;
       } catch (e) {
         // If body parsing fails, use default values
         action = 'check';

@@ -1,6 +1,5 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
 // Interval in milliseconds between polling checks (default: 5 seconds)
 const DEFAULT_POLLING_INTERVAL = 5000;
