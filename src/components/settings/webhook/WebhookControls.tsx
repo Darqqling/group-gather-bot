@@ -4,6 +4,8 @@ import { RefreshCwIcon } from "lucide-react";
 
 interface WebhookControlsProps {
   onSetup: () => void;
+  onCheck: () => void;
+  onDelete: () => void;
   onReset: () => void;
   onSave: () => void;
   isSettingUp: boolean;
@@ -13,6 +15,8 @@ interface WebhookControlsProps {
 
 const WebhookControls = ({ 
   onSetup, 
+  onCheck,
+  onDelete,
   onReset, 
   onSave, 
   isSettingUp, 
@@ -21,9 +25,17 @@ const WebhookControls = ({
 }: WebhookControlsProps) => {
   return (
     <>
-      <div className="flex justify-end space-x-2">
+      <div className="flex justify-between space-x-2">
         <Button
-          variant="outline"
+          variant="secondary"
+          onClick={onCheck}
+          disabled={isSettingUp}
+        >
+          {isSettingUp ? "Checking..." : "Check Status"}
+        </Button>
+        
+        <Button
+          variant="default"
           onClick={onSetup}
           disabled={isSettingUp}
         >
@@ -35,6 +47,14 @@ const WebhookControls = ({
           ) : (
             "Setup Webhook"
           )}
+        </Button>
+        
+        <Button
+          variant="destructive"
+          onClick={onDelete}
+          disabled={isSettingUp}
+        >
+          {isSettingUp ? "Deleting..." : "Delete Webhook"}
         </Button>
       </div>
       <div className="flex justify-between mt-4">

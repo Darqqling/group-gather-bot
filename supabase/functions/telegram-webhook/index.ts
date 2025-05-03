@@ -13,11 +13,11 @@ const corsHeaders = {
 
 // Get the token from the environment variable
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://smlqmythgpkucxbaxuob.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 // Create a supabase client with the service role key
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+const supabaseAdmin = createClient(SUPABASE_URL || "https://smlqmythgpkucxbaxuob.supabase.co", SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false }
 });
 
@@ -70,6 +70,20 @@ serve(async (req) => {
   }
 
   try {
+    // Check if bot token is set
+    if (!TELEGRAM_BOT_TOKEN) {
+      console.error("TELEGRAM_BOT_TOKEN is not configured");
+      return new Response(
+        JSON.stringify({ success: false, error: "Bot token not configured" }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+    
+    console.log(`Bot token is configured: ${TELEGRAM_BOT_TOKEN.substring(0, 3)}...${TELEGRAM_BOT_TOKEN.substring(TELEGRAM_BOT_TOKEN.length - 3)}`);
+
     // Process the Telegram update
     const update = await req.json();
     console.log("Received update:", JSON.stringify(update));
@@ -88,6 +102,7 @@ serve(async (req) => {
 
     // Check maintenance mode
     const maintenanceMode = await isMaintenanceMode();
+    console.log(`Maintenance mode: ${maintenanceMode}`);
     
     // Handle updates based on type
     if (update.message) {
@@ -136,7 +151,11 @@ serve(async (req) => {
     console.error("Error processing webhook:", error);
     
     // Log the error to the database
-    await logError(error, { source: "telegram-webhook" }, supabaseAdmin);
+    try {
+      await logError(error, { source: "telegram-webhook" }, supabaseAdmin);
+    } catch (logError) {
+      console.error("Failed to log error:", logError);
+    }
 
     return new Response(
       JSON.stringify({ success: false, error: error.message }),

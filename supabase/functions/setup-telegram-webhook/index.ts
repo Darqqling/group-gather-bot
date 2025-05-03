@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.23.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +15,7 @@ serve(async (req) => {
   try {
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
     if (!botToken) {
-      throw new Error('TELEGRAM_BOT_TOKEN not configured')
+      throw new Error('TELEGRAM_BOT_TOKEN is not configured in Supabase Secrets')
     }
 
     // Parse the request body to determine the action
@@ -41,9 +40,21 @@ serve(async (req) => {
     
     console.log(`Using webhook URL: ${webhookUrl}`);
     console.log(`Action: ${action}`);
+    console.log(`Using bot token: ${botToken.substring(0, 5)}...${botToken.substring(botToken.length - 5)}`); // Logging part of token for debugging
     
     // Handle different actions
     if (action === 'set' || !action) {
+      // Test the token first to validate it's working
+      const getMeUrl = `https://api.telegram.org/bot${botToken}/getMe`;
+      const testResponse = await fetch(getMeUrl);
+      const testResult = await testResponse.json();
+      
+      if (!testResult.ok) {
+        throw new Error(`Invalid bot token: ${testResult.description}`);
+      }
+      
+      console.log(`Bot token is valid for bot: ${testResult.result.username}`);
+
       // Set the webhook
       const setWebhookUrl = `https://api.telegram.org/bot${botToken}/setWebhook?url=${webhookUrl}`
       const response = await fetch(setWebhookUrl)

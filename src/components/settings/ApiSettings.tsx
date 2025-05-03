@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { RefreshCwIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, InfoIcon } from "lucide-react";
 
 const TELEGRAM_TOKEN_SETTING_KEY = 'telegram_token_display';
 
@@ -57,11 +58,26 @@ const ApiSettings = () => {
     }
   };
 
+  const validateToken = useCallback((token: string) => {
+    // Simple validation - Telegram bot tokens look like: 123456789:ABCDefGhIJKlmNoPQRsTUVwxyZ
+    return /^\d+:[\w-]+$/.test(token);
+  }, []);
+
   const saveToken = async () => {
     if (!telegramToken || telegramToken.trim() === "" || telegramToken === "••••••••••••••••••••••••••••••") {
       toast({
         title: "Validation Error",
         description: "Please enter a valid Telegram bot token",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // If showing the token, validate it first
+    if (isShowingToken && !validateToken(telegramToken)) {
+      toast({
+        title: "Invalid Token Format",
+        description: "Telegram token should be in format: 123456789:ABCDefGhIJKlmNoPQRsTUVwxyZ",
         variant: "destructive",
       });
       return;
@@ -73,12 +89,17 @@ const ApiSettings = () => {
     
     try {
       // First we update the edge function secret using the functions API
-      const { error: secretError } = await supabase.functions.invoke('update-telegram-token', {
+      console.log("Saving token to edge function...");
+      const { data, error: secretError } = await supabase.functions.invoke('update-telegram-token', {
         method: 'POST',
         body: { token: telegramToken },
       });
       
-      if (secretError) throw new Error(secretError.message);
+      if (secretError || !data?.success) {
+        throw new Error(secretError?.message || data?.error || "Failed to update token");
+      }
+      
+      console.log("Token updated in edge function, saving display value...");
       
       // Then we save the display value to database for the UI
       // We either save the full token (if showing) or a masked version if hidden
@@ -102,12 +123,12 @@ const ApiSettings = () => {
       
       // Auto-hide success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving token:", error);
-      setError("Failed to save token. Please try again.");
+      setError(error?.message || "Failed to save token. Please try again.");
       toast({
         title: "Error Saving Token",
-        description: error.message || "Failed to save the token. Please try again.",
+        description: error?.message || "Failed to save the token. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -137,7 +158,7 @@ const ApiSettings = () => {
         )}
 
         {success && (
-          <Alert variant="success" className="bg-green-50 border-green-200">
+          <Alert className="bg-green-50 border-green-200">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
             <AlertTitle className="text-green-600">Success</AlertTitle>
             <AlertDescription className="text-green-600">
@@ -146,13 +167,22 @@ const ApiSettings = () => {
           </Alert>
         )}
 
+        <Alert>
+          <InfoIcon className="h-4 w-4" />
+          <AlertTitle>Important</AlertTitle>
+          <AlertDescription>
+            The Telegram bot token must be correctly set for webhooks to function properly. 
+            After entering your token, click "Save API Settings" and then set up the webhook in the Bot Settings tab.
+          </AlertDescription>
+        </Alert>
+
         <div className="space-y-2">
           <Label htmlFor="telegram-api">Telegram Bot Token</Label>
           <div className="flex">
             <Input
               id="telegram-api"
               type={isShowingToken ? "text" : "password"}
-              placeholder="Your Telegram Bot Token"
+              placeholder="Your Telegram Bot Token (e.g., 123456789:ABCDefGhIJKlmNoPQRsTUVwxyZ)"
               value={telegramToken}
               onChange={(e) => setTelegramToken(e.target.value)}
               disabled={isLoading}
@@ -169,7 +199,7 @@ const ApiSettings = () => {
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Used for connecting to the Telegram Bot API.
+            Used for connecting to the Telegram Bot API. Format: 123456789:ABCDefGhIJKlmNoPQRsTUVwxyZ
           </p>
         </div>
       </CardContent>

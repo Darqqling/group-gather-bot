@@ -9,7 +9,7 @@ export async function sendTelegramMessage(chatId: number | string, text: string,
   
   if (!TELEGRAM_BOT_TOKEN) {
     console.error("TELEGRAM_BOT_TOKEN is not set");
-    return;
+    throw new Error("Telegram bot token is not configured");
   }
   
   try {
@@ -31,14 +31,16 @@ export async function sendTelegramMessage(chatId: number | string, text: string,
     );
     
     const data = await response.json();
-    console.log("Message sent response:", data);
     if (!data.ok) {
       console.error("Error from Telegram API:", data.description);
+      throw new Error(`Telegram API error: ${data.description}`);
     }
+    
+    console.log("Message sent successfully");
     return data;
   } catch (error) {
     console.error("Error sending message:", error);
-    return null;
+    throw error;
   }
 }
 
@@ -50,7 +52,7 @@ export async function answerCallbackQuery(callbackQueryId: string, text = "") {
   
   if (!TELEGRAM_BOT_TOKEN) {
     console.error("TELEGRAM_BOT_TOKEN is not set");
-    return;
+    throw new Error("Telegram bot token is not configured");
   }
   
   try {
@@ -67,10 +69,15 @@ export async function answerCallbackQuery(callbackQueryId: string, text = "") {
     );
     
     const data = await response.json();
-    console.log("Answered callback query:", data);
+    if (!data.ok) {
+      console.error("Error answering callback query:", data.description);
+      throw new Error(`Telegram API error: ${data.description}`);
+    }
+    
+    console.log("Answered callback query successfully");
     return data;
   } catch (error) {
     console.error("Error answering callback query:", error);
-    return null;
+    throw error;
   }
 }
