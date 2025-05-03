@@ -16,16 +16,18 @@ export async function saveUser(
   }
 
   try {
+    console.log(`Saving user: ${telegramUser.first_name} (${telegramUser.id})`);
+    
     const { error } = await supabaseAdmin
       .from('telegram_users')
       .upsert({
-        id: telegramUser.id.toString(),
+        telegram_id: telegramUser.id.toString(),
         first_name: telegramUser.first_name,
         last_name: telegramUser.last_name,
         username: telegramUser.username,
         language_code: telegramUser.language_code,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'id' });
+        last_active_at: new Date().toISOString()
+      }, { onConflict: 'telegram_id' });
     
     if (error) throw error;
     
@@ -48,9 +50,9 @@ export async function getUserState(
       .from('user_states')
       .select()
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
     
-    if (error && error.code !== 'PGRST116') throw error;
+    if (error) throw error;
     
     return data || null;
   } catch (error) {
@@ -84,8 +86,9 @@ export async function updateUserState(
         .upsert({
           user_id: userId,
           state,
-          data
-        });
+          data,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
       
       if (error) throw error;
     }

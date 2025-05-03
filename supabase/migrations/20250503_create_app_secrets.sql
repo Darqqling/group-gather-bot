@@ -16,3 +16,8 @@ ALTER TABLE public.app_secrets ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Service role can manage app_secrets" 
 ON public.app_secrets 
 USING (auth.jwt() IS NULL);
+
+-- Insert default token if it doesn't exist (but don't overwrite existing)
+INSERT INTO public.app_secrets (key, value, description)
+VALUES ('TELEGRAM_BOT_TOKEN', 'YOUR_DEFAULT_BOT_TOKEN', 'Telegram Bot API token')
+ON CONFLICT (key) DO NOTHING;

@@ -23,6 +23,7 @@ const supabaseAdmin = createClient(SUPABASE_URL || "https://smlqmythgpkucxbaxuob
 // Get the bot token from the database
 async function getBotToken() {
   try {
+    console.log("Retrieving bot token from database");
     const { data, error } = await supabaseAdmin
       .from('app_secrets')
       .select('value')
@@ -39,6 +40,10 @@ async function getBotToken() {
       return null;
     }
     
+    const tokenPreview = data.value.length > 10 
+      ? `${data.value.substring(0, 5)}...${data.value.substring(data.value.length - 5)}`
+      : "[EMPTY]";
+    console.log(`Retrieved bot token: ${tokenPreview}`);
     return data.value;
   } catch (error) {
     console.error("Exception retrieving bot token:", error);
@@ -92,8 +97,14 @@ async function deleteWebhook(token: string) {
     console.log("Attempting to delete webhook");
     const url = `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`;
     const response = await fetch(url);
-    const result = await response.json();
     
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error deleting webhook: ${response.status} ${errorText}`);
+      return { success: false, error: errorText };
+    }
+    
+    const result = await response.json();
     console.log("Delete webhook result:", result);
     
     return { success: result.ok, result };
@@ -110,15 +121,31 @@ async function getUpdates(token: string, offset = 0, timeout = 30) {
     const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=${timeout}`;
     console.log(`Requesting updates with offset ${offset}`);
     
-    const response = await fetch(url, { method: "GET" });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), (timeout + 5) * 1000); // Add 5 seconds buffer
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error fetching updates: ${response.status} ${errorText}`);
-      return { ok: false, error: errorText };
+    try {
+      const response = await fetch(url, { 
+        method: "GET",
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error fetching updates: ${response.status} ${errorText}`);
+        return { ok: false, error: errorText };
+      }
+      
+      return await response.json();
+    } catch (fetchError) {
+      if (fetchError.name === 'AbortError') {
+        console.error("Fetch request aborted due to timeout");
+        return { ok: false, error: "Request timeout" };
+      }
+      throw fetchError;
     }
-    
-    return await response.json();
   } catch (error) {
     console.error("Exception fetching updates:", error);
     return { ok: false, error: error.message };
@@ -179,23 +206,25 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Telegram polling function called");
+    
     // Parse the request body to get the action
     let body;
     let action = 'check';
-    let reset = false;
 
     try {
       body = await req.json();
       action = body.action || action;
-      reset = body.reset === true;
     } catch (e) {
       // If body parsing fails, use default values
       console.log('No valid JSON body, using default values');
     }
     
     // If reset is requested, reset the last update ID
-    if (reset) {
+    if (action === 'reset') {
       lastUpdateId = 0;
+      console.log("Update ID reset to 0");
+      
       return new Response(
         JSON.stringify({ success: true, message: "Update ID reset successfully" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -236,10 +265,12 @@ serve(async (req) => {
 
     // Check maintenance mode
     const maintenanceMode = await isMaintenanceMode();
+    console.log(`Maintenance mode: ${maintenanceMode}`);
 
     // Fetch updates from Telegram
     const updates = await getUpdates(token, lastUpdateId);
     if (!updates.ok) {
+      console.error("Error fetching updates:", updates.error);
       return new Response(
         JSON.stringify({ success: false, error: updates.error }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -262,7 +293,7 @@ serve(async (req) => {
       
       // Update lastUpdateId to be the highest update_id + 1, as per Telegram docs
       if (updates.result.length > 0) {
-        const maxUpdateId = Math.max(...updates.result.map(u => u.update_id));
+        const maxUpdateId = Math.max(...updates.result.map((u: any) => u.update_id));
         lastUpdateId = maxUpdateId + 1;
         console.log(`New lastUpdateId: ${lastUpdateId}`);
       }

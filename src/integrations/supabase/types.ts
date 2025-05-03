@@ -178,31 +178,67 @@ export type Database = {
       }
       telegram_users: {
         Row: {
+          current_state: string | null
           first_name: string | null
           id: string
           joined_at: string | null
+          language_code: string | null
           last_active_at: string | null
           last_name: string | null
+          state_data: Json | null
           telegram_id: string
           username: string | null
         }
         Insert: {
+          current_state?: string | null
           first_name?: string | null
           id?: string
           joined_at?: string | null
+          language_code?: string | null
           last_active_at?: string | null
           last_name?: string | null
+          state_data?: Json | null
           telegram_id: string
           username?: string | null
         }
         Update: {
+          current_state?: string | null
           first_name?: string | null
           id?: string
           joined_at?: string | null
+          language_code?: string | null
           last_active_at?: string | null
           last_name?: string | null
+          state_data?: Json | null
           telegram_id?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      user_states: {
+        Row: {
+          created_at: string | null
+          data: Json | null
+          id: string
+          state: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          state?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          state?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
