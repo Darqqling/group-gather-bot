@@ -71,12 +71,24 @@ serve(async (req) => {
       );
     }
 
-    // Update the secret in Supabase
-    const { error } = await supabaseAdmin.functions.setSecret('TELEGRAM_BOT_TOKEN', token);
+    console.log("Saving token to environment...");
+    
+    // Update the token directly
+    // Since supabaseAdmin.functions.setSecret is not available/working,
+    // we'll store it in the database app_settings table instead
+    const { error } = await supabaseAdmin
+      .from('app_secrets')
+      .upsert({
+        key: 'TELEGRAM_BOT_TOKEN',
+        value: token,
+        description: 'Telegram Bot API Token'
+      }, {
+        onConflict: 'key'
+      });
     
     if (error) {
       console.error('Error setting Telegram token:', error);
-      throw new Error('Failed to update Telegram token');
+      throw new Error('Failed to update Telegram token in database');
     }
 
     console.log("Telegram token has been updated successfully");

@@ -89,7 +89,7 @@ const ApiSettings = () => {
     
     try {
       // First we update the edge function secret using the functions API
-      console.log("Saving token to edge function...");
+      console.log("Saving token to database...");
       const { data, error: secretError } = await supabase.functions.invoke('update-telegram-token', {
         method: 'POST',
         body: { token: telegramToken },
@@ -99,7 +99,7 @@ const ApiSettings = () => {
         throw new Error(secretError?.message || data?.error || "Failed to update token");
       }
       
-      console.log("Token updated in edge function, saving display value...");
+      console.log("Token updated in database, saving display value...");
       
       // Then we save the display value to database for the UI
       // We either save the full token (if showing) or a masked version if hidden

@@ -11,8 +11,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Get the token from the environment variable
-const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+// Get environment variables
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
@@ -20,6 +19,27 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "
 const supabaseAdmin = createClient(SUPABASE_URL || "https://smlqmythgpkucxbaxuob.supabase.co", SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false }
 });
+
+// Get the bot token from the database
+async function getBotToken() {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('app_secrets')
+      .select('value')
+      .eq('key', 'TELEGRAM_BOT_TOKEN')
+      .single();
+      
+    if (error || !data) {
+      console.error("Error retrieving bot token from database:", error);
+      return null;
+    }
+    
+    return data.value;
+  } catch (error) {
+    console.error("Exception retrieving bot token:", error);
+    return null;
+  }
+}
 
 // Check if maintenance mode is enabled
 async function isMaintenanceMode() {
@@ -70,9 +90,12 @@ serve(async (req) => {
   }
 
   try {
+    // Get the bot token from the database
+    const TELEGRAM_BOT_TOKEN = await getBotToken();
+    
     // Check if bot token is set
     if (!TELEGRAM_BOT_TOKEN) {
-      console.error("TELEGRAM_BOT_TOKEN is not configured");
+      console.error("TELEGRAM_BOT_TOKEN is not configured or could not be retrieved");
       return new Response(
         JSON.stringify({ success: false, error: "Bot token not configured" }),
         { 
@@ -112,13 +135,13 @@ serve(async (req) => {
       if (maintenanceMode) {
         // If in maintenance mode, send the maintenance message
         const maintenanceMessage = await getMaintenanceMessage();
-        await sendTelegramMessage(update.message.chat.id, maintenanceMessage);
+        await sendTelegramMessage(update.message.chat.id, maintenanceMessage, { token: TELEGRAM_BOT_TOKEN });
       } else {
         // Regular message handling
         await handleMessage(
           update.message, 
           (user) => saveUser(user, supabaseAdmin),
-          sendTelegramMessage,
+          (chatId, text, options) => sendTelegramMessage(chatId, text, { ...options, token: TELEGRAM_BOT_TOKEN }),
           supabaseAdmin
         );
       }
@@ -126,14 +149,14 @@ serve(async (req) => {
       if (maintenanceMode) {
         // If in maintenance mode, answer callback query with maintenance message
         const maintenanceMessage = await getMaintenanceMessage();
-        await answerCallbackQuery(update.callback_query.id, "Сервис на обслуживании");
-        await sendTelegramMessage(update.callback_query.message.chat.id, maintenanceMessage);
+        await answerCallbackQuery(update.callback_query.id, "Сервис на обслуживании", { token: TELEGRAM_BOT_TOKEN });
+        await sendTelegramMessage(update.callback_query.message.chat.id, maintenanceMessage, { token: TELEGRAM_BOT_TOKEN });
       } else {
         // Regular callback query handling
         await handleCallbackQuery(
           update.callback_query,
-          sendTelegramMessage,
-          answerCallbackQuery,
+          (chatId, text, options) => sendTelegramMessage(chatId, text, { ...options, token: TELEGRAM_BOT_TOKEN }),
+          (callbackQueryId, text, options) => answerCallbackQuery(callbackQueryId, text, { ...options, token: TELEGRAM_BOT_TOKEN }),
           supabaseAdmin
         );
       }

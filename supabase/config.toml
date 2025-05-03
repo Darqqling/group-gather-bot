@@ -1,18 +1,11 @@
 
 project_id = "smlqmythgpkucxbaxuob"
 
-[api]
-enabled = true
+[functions.setup-telegram-webhook]
+verify_jwt = false
 
-[db]
-shadow_database_enabled = false
+[functions.update-telegram-token] 
+verify_jwt = false
 
-[realtime]
-enabled = true
-hostname = "localhost"
-
-[edge_functions]
-[edge_functions.setup-telegram-webhook]
-[edge_functions.telegram-webhook]
-[edge_functions.update-telegram-token]
-verify_jwt = true
+[functions.telegram-webhook]
+verify_jwt = false

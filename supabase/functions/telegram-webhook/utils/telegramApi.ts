@@ -4,19 +4,20 @@
 /**
  * Send messages to Telegram API
  */
-export async function sendTelegramMessage(chatId: number | string, text: string, options = {}) {
-  const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+export async function sendTelegramMessage(chatId: number | string, text: string, options: any = {}) {
+  const token = options.token;
+  delete options.token;
   
-  if (!TELEGRAM_BOT_TOKEN) {
-    console.error("TELEGRAM_BOT_TOKEN is not set");
-    throw new Error("Telegram bot token is not configured");
+  if (!token) {
+    console.error("Telegram bot token not provided");
+    throw new Error("Telegram bot token is required");
   }
   
   try {
     console.log(`Sending message to chat ${chatId}: ${text.substring(0, 50)}...`);
     
     const response = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      `https://api.telegram.org/bot${token}/sendMessage`,
       {
         method: "POST",
         headers: {
@@ -47,23 +48,25 @@ export async function sendTelegramMessage(chatId: number | string, text: string,
 /**
  * Answer callback queries
  */
-export async function answerCallbackQuery(callbackQueryId: string, text = "") {
-  const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+export async function answerCallbackQuery(callbackQueryId: string, text = "", options: any = {}) {
+  const token = options.token;
+  delete options.token;
   
-  if (!TELEGRAM_BOT_TOKEN) {
-    console.error("TELEGRAM_BOT_TOKEN is not set");
-    throw new Error("Telegram bot token is not configured");
+  if (!token) {
+    console.error("Telegram bot token not provided");
+    throw new Error("Telegram bot token is required");
   }
   
   try {
     const response = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`,
+      `https://api.telegram.org/bot${token}/answerCallbackQuery`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           callback_query_id: callbackQueryId,
-          text: text
+          text: text,
+          ...options
         }),
       }
     );

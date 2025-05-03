@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.23.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,9 +14,32 @@ serve(async (req) => {
   }
 
   try {
-    const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
+    // Get the Supabase URL and admin key from environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing environment variables for Supabase client');
+    }
+    
+    // Create a Supabase client with the admin key
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+
+    // Get the token from our app_secrets table
+    const { data: secretData, error: secretError } = await supabaseAdmin
+      .from('app_secrets')
+      .select('value')
+      .eq('key', 'TELEGRAM_BOT_TOKEN')
+      .single();
+      
+    if (secretError || !secretData) {
+      throw new Error('Failed to retrieve Telegram bot token from database');
+    }
+    
+    const botToken = secretData.value;
+    
     if (!botToken) {
-      throw new Error('TELEGRAM_BOT_TOKEN is not configured in Supabase Secrets')
+      throw new Error('TELEGRAM_BOT_TOKEN is not configured in database');
     }
 
     // Parse the request body to determine the action
@@ -56,18 +80,18 @@ serve(async (req) => {
       console.log(`Bot token is valid for bot: ${testResult.result.username}`);
 
       // Set the webhook
-      const setWebhookUrl = `https://api.telegram.org/bot${botToken}/setWebhook?url=${webhookUrl}`
-      const response = await fetch(setWebhookUrl)
-      const result = await response.json()
+      const setWebhookUrl = `https://api.telegram.org/bot${botToken}/setWebhook?url=${webhookUrl}`;
+      const response = await fetch(setWebhookUrl);
+      const result = await response.json();
 
       if (!result.ok) {
-        throw new Error(`Failed to set webhook: ${result.description}`)
+        throw new Error(`Failed to set webhook: ${result.description}`);
       }
 
       // Get webhook info to verify
-      const getWebhookInfoUrl = `https://api.telegram.org/bot${botToken}/getWebhookInfo`
-      const webhookInfoResponse = await fetch(getWebhookInfoUrl)
-      const webhookInfo = await webhookInfoResponse.json()
+      const getWebhookInfoUrl = `https://api.telegram.org/bot${botToken}/getWebhookInfo`;
+      const webhookInfoResponse = await fetch(getWebhookInfoUrl);
+      const webhookInfo = await webhookInfoResponse.json();
 
       return new Response(
         JSON.stringify({
@@ -81,9 +105,9 @@ serve(async (req) => {
       )
     } else if (action === 'check') {
       // Get webhook info
-      const getWebhookInfoUrl = `https://api.telegram.org/bot${botToken}/getWebhookInfo`
-      const webhookInfoResponse = await fetch(getWebhookInfoUrl)
-      const webhookInfo = await webhookInfoResponse.json()
+      const getWebhookInfoUrl = `https://api.telegram.org/bot${botToken}/getWebhookInfo`;
+      const webhookInfoResponse = await fetch(getWebhookInfoUrl);
+      const webhookInfo = await webhookInfoResponse.json();
 
       return new Response(
         JSON.stringify({
@@ -96,9 +120,9 @@ serve(async (req) => {
       )
     } else if (action === 'delete') {
       // Delete the webhook
-      const deleteWebhookUrl = `https://api.telegram.org/bot${botToken}/deleteWebhook`
-      const response = await fetch(deleteWebhookUrl)
-      const result = await response.json()
+      const deleteWebhookUrl = `https://api.telegram.org/bot${botToken}/deleteWebhook`;
+      const response = await fetch(deleteWebhookUrl);
+      const result = await response.json();
 
       return new Response(
         JSON.stringify({
@@ -110,10 +134,10 @@ serve(async (req) => {
         }
       )
     } else {
-      throw new Error(`Unknown action: ${action}`)
+      throw new Error(`Unknown action: ${action}`);
     }
   } catch (error) {
-    console.error('Error managing webhook:', error)
+    console.error('Error managing webhook:', error);
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -125,4 +149,4 @@ serve(async (req) => {
       }
     )
   }
-})
+});
