@@ -1,68 +1,86 @@
 
 import { Button } from "@/components/ui/button";
-import { RefreshCwIcon } from "lucide-react";
+import { RefreshCwIcon, PlayIcon, PauseIcon } from "lucide-react";
+import { isPollingActive, startPolling, stopPolling, resetPolling } from "@/services/telegramPollingService";
+import { useState, useEffect } from "react";
 
 interface WebhookControlsProps {
-  onSetup: () => void;
-  onCheck: () => void;
-  onDelete: () => void;
-  onReset: () => void;
   onSave: () => void;
-  isSettingUp: boolean;
   isLoading: boolean;
   isSaving: boolean;
 }
 
 const WebhookControls = ({ 
-  onSetup, 
-  onCheck,
-  onDelete,
-  onReset, 
   onSave, 
-  isSettingUp, 
   isLoading, 
   isSaving 
 }: WebhookControlsProps) => {
+  const [isActive, setIsActive] = useState(false);
+
+  useEffect(() => {
+    const checkStatus = () => {
+      setIsActive(isPollingActive());
+    };
+    
+    checkStatus();
+    const interval = setInterval(checkStatus, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleStartPolling = () => {
+    startPolling();
+    setIsActive(true);
+  };
+
+  const handleStopPolling = () => {
+    stopPolling();
+    setIsActive(false);
+  };
+
+  const handleResetPolling = async () => {
+    const success = await resetPolling();
+    if (success) {
+      if (isActive) {
+        stopPolling();
+        setTimeout(() => startPolling(), 1000);
+      }
+    }
+  };
+
   return (
     <>
       <div className="flex justify-between space-x-2">
         <Button
-          variant="secondary"
-          onClick={onCheck}
-          disabled={isSettingUp}
+          variant={isActive ? "destructive" : "default"}
+          onClick={isActive ? handleStopPolling : handleStartPolling}
+          disabled={isLoading}
         >
-          {isSettingUp ? "Checking..." : "Check Status"}
-        </Button>
-        
-        <Button
-          variant="default"
-          onClick={onSetup}
-          disabled={isSettingUp}
-        >
-          {isSettingUp ? (
+          {isActive ? (
             <>
-              <RefreshCwIcon className="mr-2 h-4 w-4 animate-spin" />
-              Setting up...
+              <PauseIcon className="mr-2 h-4 w-4" />
+              Остановить опрос
             </>
           ) : (
-            "Setup Webhook"
+            <>
+              <PlayIcon className="mr-2 h-4 w-4" />
+              Запустить опрос
+            </>
           )}
         </Button>
         
         <Button
-          variant="destructive"
-          onClick={onDelete}
-          disabled={isSettingUp}
+          variant="secondary"
+          onClick={handleResetPolling}
+          disabled={isLoading}
         >
-          {isSettingUp ? "Deleting..." : "Delete Webhook"}
+          <RefreshCwIcon className="mr-2 h-4 w-4" />
+          Сбросить счетчик
         </Button>
       </div>
       <div className="flex justify-between mt-4">
-        <Button variant="outline" onClick={onReset} disabled={isLoading || isSaving}>
-          Reset to Default
-        </Button>
         <Button onClick={onSave} disabled={isLoading || isSaving}>
-          {isSaving ? "Saving..." : "Save URL"}
+          {isSaving ? "Сохранение..." : "Сохранить токен"}
         </Button>
       </div>
     </>

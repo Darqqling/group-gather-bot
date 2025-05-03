@@ -1,33 +1,17 @@
 
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import PollingStatus from "./PollingStatus";
 
-interface WebhookStatusProps {
-  webhookStatus: {
-    url: string;
-    last_error_date?: number;
-    last_error_message?: string;
-    pending_update_count?: number;
-  } | null;
-}
-
-const WebhookStatus = ({ webhookStatus }: WebhookStatusProps) => {
-  if (!webhookStatus) return null;
-
+const WebhookStatus = () => {
   return (
     <Alert>
-      <AlertTitle>Webhook Status</AlertTitle>
+      <AlertTitle>Статус опроса Telegram</AlertTitle>
       <AlertDescription>
         <div className="mt-2 space-y-1">
-          <p>URL: {webhookStatus.url}</p>
-          {webhookStatus.last_error_date && (
-            <p className="text-red-500">
-              Last Error: {new Date(webhookStatus.last_error_date * 1000).toLocaleString()}
-              {webhookStatus.last_error_message && ` - ${webhookStatus.last_error_message}`}
-            </p>
-          )}
-          {webhookStatus.pending_update_count && webhookStatus.pending_update_count > 0 && (
-            <p>Pending Updates: {webhookStatus.pending_update_count}</p>
-          )}
+          <PollingStatus />
+          <p className="text-sm text-gray-500 mt-2">
+            Интервал опроса: 5 секунд. При опросе бот проверяет новые сообщения через API Telegram.
+          </p>
         </div>
       </AlertDescription>
     </Alert>

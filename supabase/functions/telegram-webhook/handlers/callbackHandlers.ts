@@ -1,8 +1,6 @@
-
 // Handlers for Telegram callback queries
 import { 
-  updateCollectionStatus, 
-  getCollectionById, 
+  getCollectionById,
   updateUserState
 } from "../utils/databaseUtils.ts";
 
@@ -227,5 +225,25 @@ export async function handleCallbackQuery(
       callbackQuery.message.chat.id,
       "Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже."
     );
+  }
+}
+
+// Helper function to update collection status
+async function updateCollectionStatus(supabaseAdmin: any, collectionId: string, status: string) {
+  try {
+    const { error } = await supabaseAdmin
+      .from('collections')
+      .update({ status })
+      .eq('id', collectionId);
+    
+    if (error) {
+      console.error("Error updating collection status:", error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Exception updating collection status:", error);
+    return { success: false, error: error.message };
   }
 }
