@@ -1,10 +1,50 @@
-# Welcome to your Lovable project
+
+# Telegram Bot Collection Manager
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/d29d3bab-2b62-4a86-945c-71e53817796b
 
-## How can I edit this code?
+## Recent fixes (May 3, 2025)
+
+We resolved several critical issues with the Telegram bot integration:
+
+1. Created a secure `app_secrets` table in the database for storing sensitive information like the Telegram bot token
+2. Updated the edge functions (`update-telegram-token`, `setup-telegram-webhook`, `telegram-webhook`) to properly retrieve the token from the database
+3. Fixed UI components to handle token updates and webhook configuration
+4. Resolved issues with token storage and retrieval using proper upsert operations with conflict handling
+
+These changes enable the bot to successfully:
+- Register with the Telegram API
+- Receive and respond to basic commands
+- Process user interactions
+
+## Known limitations
+
+The bot currently has some functional limitations that need to be addressed:
+
+1. New collection creation flow is incomplete - the bot doesn't properly handle the input of collection names after the `/new` command
+2. Command naming inconsistencies between the admin interface and bot implementation
+3. Some callback queries may cause errors due to improper UUID validation
+
+## How to use the bot
+
+1. Configure your bot token in the admin panel:
+   - Go to Settings > API Keys
+   - Enter your Telegram bot token
+   - Save the token
+
+2. Set up the webhook:
+   - Go to Settings > Bot Settings
+   - Click "Setup Webhook" to connect Telegram to your bot
+   - Verify the webhook status shows "Active"
+
+3. Test basic commands:
+   - `/start` - Introduction message
+   - `/new` - Start creating a new collection
+   - `/history` - View past collections
+
+## How to edit this code?
 
 There are several ways of editing your application.
 
@@ -59,6 +99,7 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (for backend functionality and edge functions)
 
 ## How can I deploy this project?
 
