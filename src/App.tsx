@@ -11,13 +11,27 @@ import { initializeMaintenanceSettings } from "./services/maintenanceService";
 
 const App = () => {
   // Move QueryClient initialization inside the component
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: 1,
+        refetchOnWindowFocus: false,
+      },
+    },
+  }));
 
   useEffect(() => {
-    // Initialize maintenance settings when the app starts
-    initializeMaintenanceSettings().catch(err => {
-      console.error("Failed to initialize maintenance settings:", err);
-    });
+    // Initialize settings when the app starts
+    const initSettings = async () => {
+      try {
+        await initializeMaintenanceSettings();
+        console.log("Settings initialized successfully");
+      } catch (err) {
+        console.error("Failed to initialize settings:", err);
+      }
+    };
+    
+    initSettings();
   }, []);
 
   return (

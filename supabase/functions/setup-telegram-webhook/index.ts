@@ -20,10 +20,27 @@ serve(async (req) => {
     }
 
     // Parse the request body to determine the action
-    const { action } = await req.json()
+    let action = 'set'; // Default action
+    let requestBody = {};
     
-    // Default webhook URL
-    const webhookUrl = 'https://smlqmythgpkucxbaxuob.supabase.co/functions/v1/telegram-webhook'
+    try {
+      const text = await req.text();
+      if (text && text.trim().length > 0) {
+        requestBody = JSON.parse(text);
+        if (requestBody.action) {
+          action = requestBody.action;
+        }
+      }
+    } catch (parseError) {
+      console.log('No valid JSON in request body or empty body, using default action');
+    }
+    
+    // Default webhook URL - get from environment or use hardcoded value
+    const webhookBaseUrl = Deno.env.get('WEBHOOK_BASE_URL') || 'https://smlqmythgpkucxbaxuob.supabase.co';
+    const webhookUrl = `${webhookBaseUrl}/functions/v1/telegram-webhook`;
+    
+    console.log(`Using webhook URL: ${webhookUrl}`);
+    console.log(`Action: ${action}`);
     
     // Handle different actions
     if (action === 'set' || !action) {

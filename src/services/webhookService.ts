@@ -8,7 +8,7 @@ export const getWebhookUrl = async (): Promise<string | null> => {
     .from('app_settings')
     .select('value')
     .eq('key', WEBHOOK_URL_SETTING_KEY)
-    .single();
+    .maybeSingle();
   
   if (error) {
     console.error("Error fetching webhook URL:", error);

@@ -3,27 +3,16 @@ project_id = "smlqmythgpkucxbaxuob"
 
 [api]
 enabled = true
-port = 54321
-schemas = ["public", "storage"]
 
 [db]
-port = 54322
+shadow_database_enabled = false
 
 [realtime]
 enabled = true
+hostname = "localhost"
 
-[storage]
-enabled = true
-
-[auth]
-enabled = true
-site_url = "http://localhost:3000"
-
-[analytics]
-enabled = false
-
-[functions.telegram-webhook]
-verify_jwt = false
-
-[functions.setup-telegram-webhook]
-verify_jwt = false
+[edge_functions]
+[edge_functions.setup-telegram-webhook]
+[edge_functions.telegram-webhook]
+[edge_functions.update-telegram-token]
+verify_jwt = true

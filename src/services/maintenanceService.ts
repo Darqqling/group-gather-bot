@@ -106,7 +106,42 @@ export const initializeMaintenanceSettings = async (): Promise<void> => {
           description: 'Message shown during maintenance mode'
         });
     }
+
+    // Initialize webhook URL setting
+    const { data: webhookData } = await supabase
+      .from('app_settings')
+      .select('*')
+      .eq('key', 'telegram_webhook_url')
+      .maybeSingle();
+
+    if (!webhookData) {
+      await supabase
+        .from('app_settings')
+        .insert({
+          key: 'telegram_webhook_url',
+          value: 'https://smlqmythgpkucxbaxuob.supabase.co/functions/v1/telegram-webhook',
+          description: 'URL for Telegram bot webhook'
+        });
+    }
+
+    // Initialize token display setting (not the actual token)
+    const { data: tokenDisplayData } = await supabase
+      .from('app_settings')
+      .select('*')
+      .eq('key', 'telegram_token_display')
+      .maybeSingle();
+
+    if (!tokenDisplayData) {
+      await supabase
+        .from('app_settings')
+        .insert({
+          key: 'telegram_token_display',
+          value: '••••••••••••••••••••••••••••••',
+          description: 'Display value for Telegram bot token (not the actual token)'
+        });
+    }
+    
   } catch (error) {
-    console.error("Error initializing maintenance settings:", error);
+    console.error("Error initializing settings:", error);
   }
 };
