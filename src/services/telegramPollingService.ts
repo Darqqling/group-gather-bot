@@ -61,7 +61,7 @@ export function stopPolling(): void {
   }
 }
 
-// Add the missing resetPolling function
+// Add the resetPolling function that was referenced but not implemented
 export async function resetPolling(): Promise<boolean> {
   console.log("Resetting Telegram polling state...");
   

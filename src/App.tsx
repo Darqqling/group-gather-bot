@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { initializeMaintenanceSettings } from "./services/maintenanceService";
+import { startPolling } from "./services/telegramPollingService";
 
 const App = () => {
   // Move QueryClient initialization inside the component
@@ -26,6 +27,18 @@ const App = () => {
       try {
         await initializeMaintenanceSettings();
         console.log("Settings initialized successfully");
+        
+        // Auto-start polling when app loads
+        try {
+          const pollingResult = await startPolling();
+          if (pollingResult.success) {
+            console.log("Telegram polling started automatically");
+          } else {
+            console.warn("Failed to auto-start polling:", pollingResult.error);
+          }
+        } catch (pollError) {
+          console.error("Error auto-starting Telegram polling:", pollError);
+        }
       } catch (err) {
         console.error("Failed to initialize settings:", err);
       }
