@@ -1,151 +1,163 @@
 
-import { useEffect, useState } from "react";
-import { Activity, Users, AlertTriangle, MessageSquare } from "lucide-react";
-import StatsCard from "@/components/dashboard/StatsCard";
-import CollectionStats from "@/components/dashboard/CollectionStats";
-import CollectionCard, { CollectionProps } from "@/components/collections/CollectionCard";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import type { Collection, Payment, TelegramUser } from "@/types";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
+import { startPolling, stopPolling, resetPolling } from "@/services/telegramPollingService";
+import { useEffect, useState } from "react";
+import { Bot, Play, RefreshCw, StopCircle } from "lucide-react";
+import AppVersion from "@/components/AppVersion";
 
-const Dashboard = () => {
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeCollections: 0,
-    completedCollections: 0,
-    canceledCollections: 0,
-    totalAmount: 0
-  });
-  const [recentCollections, setRecentCollections] = useState<Collection[]>([]);
+export default function Dashboard() {
+  const { toast } = useToast();
+  const [pollingStatus, setPollingStatus] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      const { data: users } = await supabase
-        .from('telegram_users')
-        .select('*');
-
-      const { data: collections } = await supabase
-        .from('collections')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      const { data: payments } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('status', 'confirmed');
-
-      // Count participants per collection using a select count query
-      const { data: participantsCountData } = await supabase
-        .from('payments')
-        .select('collection_id, count', { count: 'exact' })
-        .in('collection_id', collections?.map(c => c.id) || []);
-
-      // Create a map of collection ID to participant count
-      const participantCountMap = (participantsCountData || []).reduce<Record<string, number>>((acc, curr) => {
-        if (curr.collection_id) {
-          acc[curr.collection_id] = Number(curr.count) || 0;
-        }
-        return acc;
-      }, {});
-
-      // Convert collections data to match the Collection type
-      const typedCollections = collections?.map(collection => {
-        let status: "active" | "finished" | "cancelled" = "active";
-        if (collection.status === "finished") status = "finished";
-        else if (collection.status === "cancelled") status = "cancelled";
-        
-        return {
-          ...collection,
-          status
-        } as Collection;
-      }) || [];
-
-      const activeCount = typedCollections.filter(c => c.status === 'active').length || 0;
-      const completedCount = typedCollections.filter(c => c.status === 'finished').length || 0;
-      const canceledCount = typedCollections.filter(c => c.status === 'cancelled').length || 0;
-      const totalAmount = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-
-      setStats({
-        totalUsers: users?.length || 0,
-        activeCollections: activeCount,
-        completedCollections: completedCount,
-        canceledCollections: canceledCount,
-        totalAmount
-      });
-
-      setRecentCollections(typedCollections);
-    };
-
-    fetchDashboardData();
+    // Check if polling is active from localStorage
+    const isActive = localStorage.getItem('telegram_polling_active') === 'true';
+    setPollingStatus(isActive);
   }, []);
 
-  const prepareCollectionProps = (collection: Collection): CollectionProps => {
-    return {
-      id: collection.id,
-      title: collection.title,
-      description: collection.description || "",
-      creator: {
-        name: "User", // This would ideally come from a join with telegram_users
-      },
-      targetAmount: collection.target_amount,
-      currentAmount: collection.current_amount || 0,
-      status: collection.status,
-      deadline: collection.deadline,
-      participantsCount: 0, // This would come from the participantCountMap if needed
-    };
+  const handleStartPolling = async () => {
+    setLoading(true);
+    try {
+      const result = await startPolling();
+      if (result.success) {
+        setPollingStatus(true);
+        localStorage.setItem('telegram_polling_active', 'true');
+        toast({
+          title: "Опрос запущен",
+          description: "Telegram бот начал получать обновления",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Ошибка запуска",
+          description: result.error || "Не удалось запустить опрос",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Произошла ошибка при запуске опроса",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStopPolling = () => {
+    setLoading(true);
+    try {
+      stopPolling();
+      setPollingStatus(false);
+      localStorage.setItem('telegram_polling_active', 'false');
+      toast({
+        title: "Опрос остановлен",
+        description: "Telegram бот больше не получает обновления",
+        variant: "default"
+      });
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: "Произошла ошибка при остановке опроса",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPolling = async () => {
+    setLoading(true);
+    try {
+      const success = await resetPolling();
+      if (success) {
+        toast({
+          title: "Сброс выполнен",
+          description: "Состояние опроса сброшено успешно",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Ошибка сброса",
+          description: "Не удалось сбросить состояние опроса",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: "Произошла ошибка при сбросе состояния опроса",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatsCard
-          title="Total Users"
-          value={stats.totalUsers.toString()}
-          icon={Users}
-        />
-        <StatsCard
-          title="Active Collections"
-          value={stats.activeCollections.toString()}
-          icon={Activity}
-          description="Currently running"
-        />
-        <StatsCard
-          title="Total Amount"
-          value={`₽${stats.totalAmount.toLocaleString()}`}
-          icon={MessageSquare}
-          description="All time"
-        />
-        <StatsCard
-          title="Success Rate"
-          value={`${stats.completedCollections > 0 
-            ? Math.round((stats.completedCollections / (stats.completedCollections + stats.canceledCollections)) * 100)
-            : 0}%`}
-          icon={AlertTriangle}
-        />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="md:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Recent Collections</h2>
-            <Button variant="outline" size="sm">View All</Button>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {recentCollections.map((collection) => (
-              <CollectionCard key={collection.id} {...prepareCollectionProps(collection)} />
-            ))}
-          </div>
-        </div>
-        <CollectionStats
-          activeCollections={stats.activeCollections}
-          completedCollections={stats.completedCollections}
-          canceledCollections={stats.canceledCollections}
-          totalAmount={`₽${stats.totalAmount.toLocaleString()}`}
-        />
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">Панель управления</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bot size={20} />
+              Управление Telegram ботом
+            </CardTitle>
+            <CardDescription>Запуск и остановка опроса Telegram</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm mb-4">
+              Текущий статус: 
+              <span className={`font-bold ml-2 ${pollingStatus ? 'text-green-500' : 'text-red-500'}`}>
+                {pollingStatus ? 'Активен' : 'Остановлен'}
+              </span>
+            </p>
+            <p className="text-muted-foreground text-sm mb-4">
+              Опрос Telegram позволяет боту получать сообщения от пользователей. 
+              Вы можете запустить или остановить опрос в любой момент.
+            </p>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            {!pollingStatus ? (
+              <Button 
+                onClick={handleStartPolling} 
+                disabled={loading}
+                className="flex gap-2"
+              >
+                <Play size={16} />
+                Запустить опрос
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleStopPolling} 
+                disabled={loading} 
+                variant="destructive"
+                className="flex gap-2"
+              >
+                <StopCircle size={16} />
+                Остановить опрос
+              </Button>
+            )}
+            <Button 
+              onClick={handleResetPolling} 
+              disabled={loading} 
+              variant="outline"
+              className="flex gap-2"
+            >
+              <RefreshCw size={16} />
+              Сбросить состояние
+            </Button>
+          </CardFooter>
+        </Card>
+        
+        <AppVersion />
       </div>
     </div>
   );
-};
-
-export default Dashboard;
+}

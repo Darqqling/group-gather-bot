@@ -33,6 +33,7 @@ export async function handleCollectionCreation(
     switch (stateData.step) {
       case CollectionCreationStep.TITLE:
         // Сохраняем название и запрашиваем описание
+        console.log("Saving title and asking for description");
         const titleStateData: CollectionCreationData = {
           ...stateData,
           step: CollectionCreationStep.DESCRIPTION,
@@ -55,6 +56,7 @@ export async function handleCollectionCreation(
         
       case CollectionCreationStep.DESCRIPTION:
         // Сохраняем описание и запрашиваем сумму
+        console.log("Saving description and asking for amount");
         const descStateData: CollectionCreationData = {
           ...stateData,
           step: CollectionCreationStep.AMOUNT,
@@ -95,6 +97,7 @@ export async function handleCollectionCreation(
         }
         
         // Сохраняем сумму и запрашиваем дедлайн
+        console.log("Saving amount and asking for deadline");
         const amountStateData: CollectionCreationData = {
           ...stateData,
           step: CollectionCreationStep.DEADLINE,

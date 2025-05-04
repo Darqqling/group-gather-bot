@@ -1,4 +1,3 @@
-
 /**
  * Обработчики callback-запросов для Telegram бота
  */
@@ -87,6 +86,7 @@ export async function handleCallbackQuery(
       const dialogState = await getDialogState(userId, supabaseAdmin);
       
       if (dialogState.state === DialogState.CREATING_COLLECTION && dialogState.data) {
+        console.log("Going back to description step");
         const newStateData = {
           ...dialogState.data,
           step: CollectionCreationStep.DESCRIPTION
@@ -98,7 +98,7 @@ export async function handleCallbackQuery(
         
         await sendTelegramMessage(
           chatId,
-          `Описание сбора: ${dialogState.data.description}\nВы можете изменить его. Введите новое описание:`,
+          `Текущее описание: "${dialogState.data.description || ''}"\nВведите новое описание:`,
           {
             reply_markup: JSON.stringify({
               inline_keyboard: [
@@ -106,6 +106,13 @@ export async function handleCallbackQuery(
               ]
             })
           }
+        );
+      } else {
+        await answerCallbackQuery(callbackQuery.id, "Невозможно вернуться: диалог не найден");
+        await resetDialogState(userId, supabaseAdmin);
+        await sendTelegramMessage(
+          chatId, 
+          "Произошла ошибка при навигации. Пожалуйста, начните создание сбора заново с команды /new"
         );
       }
       return;
@@ -115,6 +122,7 @@ export async function handleCallbackQuery(
       const dialogState = await getDialogState(userId, supabaseAdmin);
       
       if (dialogState.state === DialogState.CREATING_COLLECTION && dialogState.data) {
+        console.log("Going back to amount step");
         const newStateData = {
           ...dialogState.data,
           step: CollectionCreationStep.AMOUNT
@@ -126,7 +134,7 @@ export async function handleCallbackQuery(
         
         await sendTelegramMessage(
           chatId,
-          `Сумма сбора: ${dialogState.data.target_amount} руб.\nВы можете изменить её. Введите новую сумму:`,
+          `Текущая сумма: ${dialogState.data.target_amount || 0} руб.\nВведите новую сумму:`,
           {
             reply_markup: JSON.stringify({
               inline_keyboard: [
@@ -135,6 +143,13 @@ export async function handleCallbackQuery(
               ]
             })
           }
+        );
+      } else {
+        await answerCallbackQuery(callbackQuery.id, "Невозможно вернуться: диалог не найден");
+        await resetDialogState(userId, supabaseAdmin);
+        await sendTelegramMessage(
+          chatId, 
+          "Произошла ошибка при навигации. Пожалуйста, начните создание сбора заново с команды /new"
         );
       }
       return;
@@ -471,7 +486,7 @@ export async function handleCallbackQuery(
                 inline_keyboard: [
                   [{ text: "Активный", callback_data: `admin_set_status_${collectionId}_active` }],
                   [{ text: "Завершен", callback_data: `admin_set_status_${collectionId}_finished` }],
-                  [{ text: "Отменен", callback_data: `admin_set_status_${collectionId}_cancelled` }],
+                  [{ text: "От��енен", callback_data: `admin_set_status_${collectionId}_cancelled` }],
                   [{ text: "Назад", callback_data: "admin_change_status" }]
                 ]
               })

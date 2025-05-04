@@ -31,9 +31,24 @@ export async function createCollection(
   try {
     console.log("Creating collection:", collection);
     
+    // Проверяем, что creator_id существует и это строка
+    if (!collection.creator_id || typeof collection.creator_id !== 'string') {
+      console.error("Invalid creator_id:", collection.creator_id);
+      return { success: false, error: "Некорректный идентификатор создателя" };
+    }
+    
+    // Создаем новую запись о сборе
     const { data, error } = await supabaseAdmin
       .from("collections")
-      .insert(collection)
+      .insert({
+        title: collection.title,
+        description: collection.description,
+        target_amount: collection.target_amount,
+        current_amount: collection.current_amount || 0,
+        deadline: collection.deadline,
+        creator_id: collection.creator_id,
+        status: collection.status || "active"
+      })
       .select()
       .maybeSingle();
     
@@ -83,11 +98,12 @@ export async function updateCollectionStatus(
 /**
  * Получение коллекции по ID
  */
-export async function getCollectionById(
-  collectionId: string,
-  supabaseAdmin: any
+export async function getCollection(
+  supabaseAdmin: any,
+  collectionId: string
 ) {
   try {
+    console.log(`Getting collection with id: ${collectionId}`);
     const { data, error } = await supabaseAdmin
       .from("collections")
       .select(`
@@ -98,26 +114,20 @@ export async function getCollectionById(
         target_amount, 
         current_amount, 
         status, 
-        deadline,
-        telegram_users!collections_creator_id_fkey (
-          telegram_id,
-          first_name,
-          last_name,
-          username
-        )
+        deadline
       `)
       .eq("id", collectionId)
       .maybeSingle();
     
     if (error) {
-      console.error("Error fetching collection:", error);
-      return null;
+      console.error("Error getting collection:", error);
+      return { success: false, error: error.message };
     }
     
-    return data;
+    return { success: true, collection: data };
   } catch (error) {
-    console.error("Exception fetching collection:", error);
-    return null;
+    console.error("Exception getting collection:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -130,6 +140,13 @@ export async function getUserCollections(
   status: string | null = null
 ) {
   try {
+    console.log(`Getting collections for user ${userId} with status ${status || 'any'}`);
+    
+    if (!userId || typeof userId !== 'string') {
+      console.error("Invalid userId:", userId);
+      return { success: false, error: "Некорректный идентификатор пользователя" };
+    }
+    
     let query = supabaseAdmin
       .from("collections")
       .select(`
@@ -152,13 +169,18 @@ export async function getUserCollections(
     const { data, error } = await query;
     
     if (error) {
-      console.error("Error fetching user collections:", error);
+      console.error("Error getting user collections:", error);
       return { success: false, error: error.message };
+    }
+    
+    // Проверить, есть ли данные
+    if (!data || data.length === 0) {
+      return { success: true, collections: [], message: "У вас пока нет сборов" };
     }
     
     return { success: true, collections: data };
   } catch (error) {
-    console.error("Exception fetching user collections:", error);
+    console.error("Exception getting user collections:", error);
     return { success: false, error: error.message };
   }
 }
@@ -178,25 +200,19 @@ export async function getActiveCollections(supabaseAdmin: any) {
         target_amount, 
         current_amount, 
         status, 
-        deadline,
-        telegram_users!collections_creator_id_fkey (
-          telegram_id,
-          first_name,
-          last_name,
-          username
-        )
+        deadline
       `)
       .eq("status", "active")
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error("Error fetching active collections:", error);
+      console.error("Error getting active collections:", error);
       return { success: false, error: error.message };
     }
     
     return { success: true, collections: data };
   } catch (error) {
-    console.error("Exception fetching active collections:", error);
+    console.error("Exception getting active collections:", error);
     return { success: false, error: error.message };
   }
 }
@@ -287,8 +303,8 @@ export async function updateCollectionAmount(
  * Получение платежей коллекции
  */
 export async function getCollectionPayments(
-  collectionId: string,
-  supabaseAdmin: any
+  supabaseAdmin: any,
+  collectionId: string
 ) {
   try {
     const { data, error } = await supabaseAdmin
@@ -299,23 +315,18 @@ export async function getCollectionPayments(
         status, 
         created_at, 
         confirmed_at,
-        telegram_users!payments_user_id_fkey (
-          telegram_id,
-          first_name,
-          last_name,
-          username
-        )
+        user_id
       `)
       .eq("collection_id", collectionId);
     
     if (error) {
       console.error("Error fetching collection payments:", error);
-      return null;
+      return { success: false, error: error.message };
     }
     
-    return data;
+    return { success: true, payments: data };
   } catch (error) {
     console.error("Exception fetching collection payments:", error);
-    return null;
+    return { success: false, error: error.message };
   }
 }
