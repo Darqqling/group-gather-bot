@@ -1,18 +1,20 @@
 
-// Collection utilities for working with the collections table
+/**
+ * Утилиты для работы с коллекциями
+ */
+
+import { DialogState, CollectionCreationData, CollectionCreationStep, setDialogState } from "./dialogStateManager.ts";
 
 /**
- * Update the state data for a user's collection creation process
+ * Обновление состояния создания коллекции
  */
-export async function updateCollectionState(supabaseAdmin: any, userId: string, stateData: any) {
+export async function updateCollectionState(
+  supabaseAdmin: any,
+  userId: string,
+  stateData: CollectionCreationData
+) {
   try {
-    await supabaseAdmin
-      .from("telegram_users")
-      .update({ 
-        current_state: "creating_collection",
-        state_data: JSON.stringify(stateData)
-      })
-      .eq("telegram_id", userId);
+    return await setDialogState(userId, DialogState.CREATING_COLLECTION, stateData, supabaseAdmin);
   } catch (error) {
     console.error("Error updating collection state:", error);
     throw error;
@@ -20,22 +22,27 @@ export async function updateCollectionState(supabaseAdmin: any, userId: string, 
 }
 
 /**
- * Create a new collection in the database
+ * Создание новой коллекции
  */
-export async function createCollection(supabaseAdmin: any, collection: any) {
+export async function createCollection(
+  supabaseAdmin: any,
+  collection: any
+) {
   try {
+    console.log("Creating collection:", collection);
+    
     const { data, error } = await supabaseAdmin
       .from("collections")
       .insert(collection)
-      .select("id")
-      .single();
-      
+      .select()
+      .maybeSingle();
+    
     if (error) {
       console.error("Error creating collection:", error);
       return { success: false, error: error.message };
     }
     
-    return { success: true, collectionId: data.id };
+    return { success: true, collection: data };
   } catch (error) {
     console.error("Exception creating collection:", error);
     return { success: false, error: error.message };
@@ -43,41 +50,22 @@ export async function createCollection(supabaseAdmin: any, collection: any) {
 }
 
 /**
- * Get active collections for a user
+ * Обновление статуса коллекции
  */
-export async function getUserCollections(supabaseAdmin: any, userId: string, status?: string) {
+export async function updateCollectionStatus(
+  supabaseAdmin: any,
+  collectionId: string,
+  status: string
+) {
   try {
-    let query = supabaseAdmin
-      .from("collections")
-      .select("*")
-      .eq("creator_id", userId);
-      
-    if (status) {
-      query = query.eq("status", status);
-    }
+    console.log(`Updating collection ${collectionId} status to ${status}`);
     
-    const { data, error } = await query.order("created_at", { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching collections:", error);
-      return { success: false, error: error.message };
-    }
-    
-    return { success: true, collections: data };
-  } catch (error) {
-    console.error("Exception fetching collections:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Update collection status
- */
-export async function updateCollectionStatus(supabaseAdmin: any, collectionId: string, status: string) {
-  try {
     const { error } = await supabaseAdmin
       .from("collections")
-      .update({ status })
+      .update({
+        status,
+        last_updated_at: new Date().toISOString()
+      })
       .eq("id", collectionId);
     
     if (error) {
@@ -93,50 +81,155 @@ export async function updateCollectionStatus(supabaseAdmin: any, collectionId: s
 }
 
 /**
- * Get collection by ID
+ * Получение коллекции по ID
  */
-export async function getCollectionById(supabaseAdmin: any, collectionId: string) {
+export async function getCollectionById(
+  collectionId: string,
+  supabaseAdmin: any
+) {
   try {
     const { data, error } = await supabaseAdmin
       .from("collections")
-      .select("*")
+      .select(`
+        id, 
+        title, 
+        description, 
+        creator_id, 
+        target_amount, 
+        current_amount, 
+        status, 
+        deadline,
+        telegram_users!collections_creator_id_fkey (
+          telegram_id,
+          first_name,
+          last_name,
+          username
+        )
+      `)
       .eq("id", collectionId)
-      .single();
+      .maybeSingle();
     
     if (error) {
       console.error("Error fetching collection:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Exception fetching collection:", error);
+    return null;
+  }
+}
+
+/**
+ * Получение коллекций пользователя
+ */
+export async function getUserCollections(
+  supabaseAdmin: any,
+  userId: string,
+  status: string | null = null
+) {
+  try {
+    let query = supabaseAdmin
+      .from("collections")
+      .select(`
+        id, 
+        title, 
+        description, 
+        creator_id, 
+        target_amount, 
+        current_amount, 
+        status, 
+        deadline
+      `)
+      .eq("creator_id", userId)
+      .order('created_at', { ascending: false });
+    
+    if (status) {
+      query = query.eq("status", status);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error("Error fetching user collections:", error);
       return { success: false, error: error.message };
     }
     
-    return { success: true, collection: data };
+    return { success: true, collections: data };
   } catch (error) {
-    console.error("Exception fetching collection:", error);
+    console.error("Exception fetching user collections:", error);
     return { success: false, error: error.message };
   }
 }
 
 /**
- * Record a payment for a collection
+ * Получение активных коллекций
  */
-export async function recordPayment(supabaseAdmin: any, collectionId: string, userId: string, amount: number) {
+export async function getActiveCollections(supabaseAdmin: any) {
   try {
+    const { data, error } = await supabaseAdmin
+      .from("collections")
+      .select(`
+        id, 
+        title, 
+        description, 
+        creator_id, 
+        target_amount, 
+        current_amount, 
+        status, 
+        deadline,
+        telegram_users!collections_creator_id_fkey (
+          telegram_id,
+          first_name,
+          last_name,
+          username
+        )
+      `)
+      .eq("status", "active")
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching active collections:", error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, collections: data };
+  } catch (error) {
+    console.error("Exception fetching active collections:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Регистрация платежа
+ */
+export async function recordPayment(
+  supabaseAdmin: any,
+  collectionId: string,
+  userId: string,
+  amount: number
+) {
+  try {
+    console.log(`Recording payment of ${amount} by user ${userId} for collection ${collectionId}`);
+    
     const { data, error } = await supabaseAdmin
       .from("payments")
       .insert({
         collection_id: collectionId,
         user_id: userId,
         amount,
-        status: "pending"
+        status: "pending" // Ожидает подтверждения организатором
       })
-      .select("id")
-      .single();
+      .select()
+      .maybeSingle();
     
     if (error) {
       console.error("Error recording payment:", error);
       return { success: false, error: error.message };
     }
     
-    return { success: true, paymentId: data.id };
+    return { success: true, payment: data };
   } catch (error) {
     console.error("Exception recording payment:", error);
     return { success: false, error: error.message };
@@ -144,29 +237,35 @@ export async function recordPayment(supabaseAdmin: any, collectionId: string, us
 }
 
 /**
- * Update collection amount after payment
+ * Обновление суммы коллекции
  */
-export async function updateCollectionAmount(supabaseAdmin: any, collectionId: string, amount: number) {
+export async function updateCollectionAmount(
+  supabaseAdmin: any,
+  collectionId: string,
+  amount: number
+) {
   try {
-    // Get current collection data
-    const { data: collection, error: fetchError } = await supabaseAdmin
+    console.log(`Updating collection ${collectionId} amount by ${amount}`);
+    
+    // Получаем текущую сумму
+    const { data, error: selectError } = await supabaseAdmin
       .from("collections")
       .select("current_amount")
       .eq("id", collectionId)
-      .single();
+      .maybeSingle();
     
-    if (fetchError) {
-      console.error("Error fetching collection amount:", fetchError);
-      return { success: false, error: fetchError.message };
+    if (selectError) {
+      console.error("Error fetching collection amount:", selectError);
+      return { success: false, error: selectError.message };
     }
     
-    // Calculate new amount
-    const newAmount = (collection.current_amount || 0) + amount;
+    const currentAmount = data?.current_amount || 0;
+    const newAmount = currentAmount + amount;
     
-    // Update collection with new amount
+    // Обновляем сумму
     const { error: updateError } = await supabaseAdmin
       .from("collections")
-      .update({ 
+      .update({
         current_amount: newAmount,
         last_updated_at: new Date().toISOString()
       })
@@ -185,119 +284,38 @@ export async function updateCollectionAmount(supabaseAdmin: any, collectionId: s
 }
 
 /**
- * Get collections by status for all users (admin function)
+ * Получение платежей коллекции
  */
-export async function getAllCollections(supabaseAdmin: any, status?: string) {
-  try {
-    let query = supabaseAdmin
-      .from("collections")
-      .select("*, telegram_users(first_name, last_name, username)");
-      
-    if (status) {
-      query = query.eq("status", status);
-    }
-    
-    const { data, error } = await query.order("created_at", { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching all collections:", error);
-      return { success: false, error: error.message };
-    }
-    
-    return { success: true, collections: data };
-  } catch (error) {
-    console.error("Exception fetching all collections:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Get active collections available for payments
- */
-export async function getActiveCollections(supabaseAdmin: any) {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("collections")
-      .select("*")
-      .eq("status", "active")
-      .order("created_at", { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching active collections:", error);
-      return { success: false, error: error.message };
-    }
-    
-    return { success: true, collections: data };
-  } catch (error) {
-    console.error("Exception fetching active collections:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Get payments for a collection
- */
-export async function getPaymentsForCollection(supabaseAdmin: any, collectionId: string) {
+export async function getCollectionPayments(
+  collectionId: string,
+  supabaseAdmin: any
+) {
   try {
     const { data, error } = await supabaseAdmin
       .from("payments")
-      .select("*, telegram_users(first_name, last_name, username)")
-      .eq("collection_id", collectionId)
-      .order("created_at", { ascending: false });
+      .select(`
+        id, 
+        amount, 
+        status, 
+        created_at, 
+        confirmed_at,
+        telegram_users!payments_user_id_fkey (
+          telegram_id,
+          first_name,
+          last_name,
+          username
+        )
+      `)
+      .eq("collection_id", collectionId);
     
     if (error) {
-      console.error("Error fetching payments:", error);
-      return { success: false, error: error.message };
+      console.error("Error fetching collection payments:", error);
+      return null;
     }
     
-    return { success: true, payments: data };
+    return data;
   } catch (error) {
-    console.error("Exception fetching payments:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Confirm a payment
- */
-export async function confirmPayment(supabaseAdmin: any, paymentId: string) {
-  try {
-    const { error } = await supabaseAdmin
-      .from("payments")
-      .update({ 
-        status: "confirmed",
-        confirmed_at: new Date().toISOString()
-      })
-      .eq("id", paymentId);
-    
-    if (error) {
-      console.error("Error confirming payment:", error);
-      return { success: false, error: error.message };
-    }
-    
-    return { success: true };
-  } catch (error) {
-    console.error("Exception confirming payment:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Reset user state
- */
-export async function resetUserState(supabaseAdmin: any, userId: string) {
-  try {
-    await supabaseAdmin
-      .from("telegram_users")
-      .update({ 
-        current_state: null,
-        state_data: null
-      })
-      .eq("telegram_id", userId);
-      
-    return { success: true };
-  } catch (error) {
-    console.error("Exception resetting user state:", error);
-    return { success: false, error: error.message };
+    console.error("Exception fetching collection payments:", error);
+    return null;
   }
 }
