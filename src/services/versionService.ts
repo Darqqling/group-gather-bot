@@ -12,6 +12,7 @@ export interface Version {
 
 export async function getCurrentVersion(): Promise<Version | null> {
   try {
+    // Use the more generic query approach rather than typed approach
     const { data, error } = await supabase
       .from('app_versions')
       .select('*')
@@ -24,7 +25,19 @@ export async function getCurrentVersion(): Promise<Version | null> {
       return null;
     }
     
-    return data;
+    // Transform the data to match our Version interface
+    if (data) {
+      return {
+        id: data.id,
+        version: data.version,
+        release_date: data.release_date,
+        changes: Array.isArray(data.changes) ? data.changes : [],
+        created_at: data.created_at,
+        created_by: data.created_by
+      } as Version;
+    }
+    
+    return null;
   } catch (error) {
     console.error('Exception fetching current version:', error);
     return null;
@@ -33,6 +46,7 @@ export async function getCurrentVersion(): Promise<Version | null> {
 
 export async function getAllVersions(): Promise<Version[]> {
   try {
+    // Use the more generic query approach
     const { data, error } = await supabase
       .from('app_versions')
       .select('*')
@@ -43,7 +57,16 @@ export async function getAllVersions(): Promise<Version[]> {
       return [];
     }
     
-    return data || [];
+    // Transform the data to match our Version interface
+    return (data || []).map(item => ({
+      id: item.id,
+      version: item.version,
+      release_date: item.release_date,
+      changes: Array.isArray(item.changes) ? item.changes : [],
+      created_at: item.created_at,
+      created_by: item.created_by
+    } as Version));
+    
   } catch (error) {
     console.error('Exception fetching versions:', error);
     return [];
@@ -56,12 +79,13 @@ export async function addNewVersion(
   createdBy: string
 ): Promise<boolean> {
   try {
+    // Use the more generic insert approach
     const { error } = await supabase
       .from('app_versions')
       .insert({
-        version,
+        version: version,
         release_date: new Date().toISOString(),
-        changes,
+        changes: changes,
         created_by: createdBy
       });
     

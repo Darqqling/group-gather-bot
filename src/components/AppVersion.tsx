@@ -4,13 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { supabase } from "@/integrations/supabase/client";
-
-interface Version {
-  version: string;
-  release_date: string;
-  changes: string[];
-}
+import { getCurrentVersion, getAllVersions, Version } from "@/services/versionService";
 
 const AppVersion = () => {
   const [currentVersion, setCurrentVersion] = useState<Version | null>(null);
@@ -22,16 +16,20 @@ const AppVersion = () => {
     const fetchVersionData = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('app_versions')
-          .select('*')
-          .order('release_date', { ascending: false });
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          setCurrentVersion(data[0]);
-          setPreviousVersions(data.slice(1));
+        
+        const current = await getCurrentVersion();
+        if (current) {
+          setCurrentVersion(current);
+        }
+        
+        const all = await getAllVersions();
+        if (all.length > 0) {
+          // Skip the current version when setting previous versions
+          if (current) {
+            setPreviousVersions(all.filter(v => v.id !== current.id));
+          } else {
+            setPreviousVersions(all);
+          }
         }
       } catch (err) {
         console.error("Error fetching version data:", err);
@@ -89,7 +87,7 @@ const AppVersion = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {currentVersion && (
+        {currentVersion ? (
           <div className="mb-4">
             <h3 className="font-semibold mb-2">Текущая версия:</h3>
             <ul className="list-disc pl-5 space-y-1">
@@ -98,6 +96,8 @@ const AppVersion = () => {
               ))}
             </ul>
           </div>
+        ) : (
+          <p>Информация о версии недоступна</p>
         )}
 
         {previousVersions.length > 0 && (
