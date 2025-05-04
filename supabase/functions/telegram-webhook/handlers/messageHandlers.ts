@@ -2,6 +2,7 @@
 // Message handlers for the Telegram bot
 import { saveUser, getUserState } from "../utils/databaseUtils.ts";
 import { handleCommand } from "../utils/commandHandler.ts";
+import { handleCallbackQuery } from "../utils/callbackHandler.ts";
 import { 
   DialogState, 
   resetDialogState 
@@ -89,4 +90,20 @@ export async function handleMessage(
       })
     }
   );
+}
+
+/**
+ * Handle callback queries from Telegram
+ */
+export function handleCallback(
+  callbackQuery: any,
+  supabaseAdmin: any,
+  sendTelegramMessage: Function
+) {
+  if (!callbackQuery) {
+    console.log("Invalid callback query format");
+    return;
+  }
+  
+  return handleCallbackQuery(callbackQuery, supabaseAdmin, sendTelegramMessage);
 }

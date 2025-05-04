@@ -5,7 +5,8 @@
 import { 
   getUserCollections, 
   getActiveCollections, 
-  createCollection 
+  createCollection,
+  getCollection
 } from "./collectionUtils.ts";
 import { 
   DialogState, 
@@ -14,9 +15,13 @@ import {
   resetDialogState,
   CollectionCreationData,
   PaymentFlowData,
-  PaymentFlowStep
+  PaymentFlowStep,
+  getCollectionContext,
+  setCollectionContext,
+  clearCollectionContext
 } from "./dialogStateManager.ts";
 import { isUserAdmin } from "./databaseUtils.ts";
+import { validateCommand, shouldClearContext } from "./commandValidator.ts";
 
 /**
  * Обработать команду /start
@@ -360,6 +365,134 @@ export async function handleAdminCommand(
 }
 
 /**
+ * Функция для получения русского названия статуса
+ */
+function getStatusName(status: string): string {
+  switch (status) {
+    case "draft":
+      return "Черновик";
+    case "active":
+      return "Активен";
+    case "finished":
+      return "Завершён";
+    case "cancelled":
+      return "Отменён";
+    default:
+      return status;
+  }
+}
+
+/**
+ * Функция для обработки случаев, когда команда требует контекста, но он отсутствует
+ */
+async function handleCommandWithNoContext(
+  command: string,
+  message: any,
+  supabaseAdmin: any,
+  sendTelegramMessage: Function
+) {
+  const userId = message.from.id.toString();
+  
+  // Получаем коллекции пользователя
+  const userCollectionsResult = await getUserCollections(supabaseAdmin, userId);
+  
+  if (!userCollectionsResult.success || !userCollectionsResult.collections || userCollectionsResult.collections.length === 0) {
+    return sendTelegramMessage(
+      message.chat.id,
+      "У вас нет доступных сборов. Создайте новый сбор с помощью команды /new."
+    );
+  }
+  
+  // Если у пользователя только один сбор, автоматически выбираем его
+  if (userCollectionsResult.collections.length === 1) {
+    const collection = userCollectionsResult.collections[0];
+    
+    await setCollectionContext(userId, {
+      collectionId: collection.id,
+      status: collection.status,
+      title: collection.title
+    }, supabaseAdmin);
+    
+    // Повторно выполняем команду с контекстом
+    return handleCommand(message, supabaseAdmin, sendTelegramMessage);
+  }
+  
+  // Если несколько сборов, предлагаем выбор
+  const inlineKeyboard = userCollectionsResult.collections.map(collection => ([{
+    text: `${collection.title} (${getStatusName(collection.status)})`,
+    callback_data: `select_context_${collection.id}_for_${command.substring(1)}`
+  }]));
+  
+  return sendTelegramMessage(
+    message.chat.id,
+    "Выберите сбор:",
+    {
+      reply_markup: JSON.stringify({
+        inline_keyboard: inlineKeyboard
+      })
+    }
+  );
+}
+
+/**
+ * Функция для обработки команд, требующих контекста
+ */
+async function handleContextCommand(
+  command: string,
+  message: any,
+  context: any,
+  supabaseAdmin: any,
+  sendTelegramMessage: Function
+) {
+  // Здесь реализуется логика обработки команд /setname, /setdescription и т.д.
+  // В зависимости от команды и статуса контекста
+  
+  const userId = message.from.id.toString();
+  const chatId = message.chat.id;
+  
+  // Пример для команды /get - получить информацию о сборе
+  if (command === '/get') {
+    try {
+      const collectionResult = await getCollection(supabaseAdmin, context.collectionId);
+      
+      if (!collectionResult.success || !collectionResult.collection) {
+        return sendTelegramMessage(
+          chatId,
+          "Не удалось найти выбранный сбор. В��зможно, он был удален."
+        );
+      }
+      
+      const collection = collectionResult.collection;
+      const status = getStatusName(collection.status);
+      const deadline = new Date(collection.deadline).toLocaleDateString('ru-RU');
+      
+      return sendTelegramMessage(
+        chatId,
+        `*${collection.title}*\n\n` +
+        `Описание: ${collection.description || "Не указано"}\n` +
+        `Статус: ${status}\n` +
+        `Сумма: ${collection.current_amount || 0}/${collection.target_amount} руб.\n` +
+        `Дедлайн: ${deadline}`,
+        { parse_mode: "Markdown" }
+      );
+    } catch (error) {
+      console.error("Error getting collection info:", error);
+      return sendTelegramMessage(
+        chatId,
+        "Произошла ошибка при получении информации о сборе."
+      );
+    }
+  }
+  
+  // Реализации других команд...
+  
+  return sendTelegramMessage(
+    chatId,
+    `Команда ${command} находится в разработке.`
+  );
+}
+
+/**
  * Обработчик всех команд
  */
 export function handleCommand(
@@ -368,59 +501,131 @@ export function handleCommand(
   sendTelegramMessage: Function
 ) {
   try {
-    const command = message.text.split(' ')[0].toLowerCase();
+    const commandText = message.text;
+    const command = commandText.split(' ')[0].toLowerCase();
     const userId = message.from.id.toString();
     
     console.log(`Processing command: ${command} from user ${userId}`);
     
-    switch(command) {
-      case '/start':
-        return handleStartCommand(message, supabaseAdmin, sendTelegramMessage);
+    // Асинхронная функция для обработки команды
+    const processCommand = async () => {
+      // Проверяем, требует ли команда сброса контекста
+      if (shouldClearContext(command)) {
+        // Явно сбрасываем контекст для команд с no_context: true
+        console.log(`Command ${command} requires context reset`);
+        await clearCollectionContext(userId, supabaseAdmin);
+      }
       
-      case '/help':
-        return handleHelpCommand(message, supabaseAdmin, sendTelegramMessage);
+      // Получаем текущий контекст сбора
+      let context = await getCollectionContext(userId, supabaseAdmin);
       
-      case '/new':
-        return handleNewCommand(message, supabaseAdmin, sendTelegramMessage);
+      // Если есть контекст, проверяем существование сбора
+      if (context && context.collectionId) {
+        const collectionResult = await getCollection(supabaseAdmin, context.collectionId);
+        if (!collectionResult.success || !collectionResult.collection) {
+          // Сбор не найден, сбрасываем контекст
+          await clearCollectionContext(userId, supabaseAdmin);
+          context = null;
+        } else {
+          // Обновляем статус сбора в контексте
+          context.status = collectionResult.collection.status;
+        }
+      }
       
-      case '/finish':
-        return handleFinishCommand(message, supabaseAdmin, sendTelegramMessage);
+      // Валидируем команду
+      const validationResult = validateCommand(command, context);
+      console.log(`Command validation result:`, validationResult);
       
-      case '/cancel':
-        return handleCancelCommand(message, supabaseAdmin, sendTelegramMessage);
+      if (!validationResult.allowed) {
+        // Обработка ошибок валидации
+        if (validationResult.error?.code === "NO_CONTEXT") {
+          // Если требуется контекст, но он отсутствует, предлагаем пользователю выбрать сбор
+          return handleCommandWithNoContext(command, message, supabaseAdmin, sendTelegramMessage);
+        } else if (validationResult.error?.code === "CONTEXT_NOT_FOUND") {
+          // Если контекст задан, но сбор не найден
+          await clearCollectionContext(userId, supabaseAdmin);
+          return sendTelegramMessage(
+            message.chat.id,
+            validationResult.error.message
+          );
+        } else if (validationResult.error?.code === "INVALID_STATUS") {
+          // Если статус не подходит, сообщаем об ошибке
+          return sendTelegramMessage(
+            message.chat.id,
+            validationResult.error.message
+          );
+        } else {
+          // Другие ошибки
+          return sendTelegramMessage(
+            message.chat.id,
+            validationResult.error?.message || "Произошла ошибка при выполнении команды."
+          );
+        }
+      }
       
-      case '/paid':
-        return handlePaidCommand(message, supabaseAdmin, sendTelegramMessage);
-      
-      case '/history':
-        return handleHistoryCommand(message, supabaseAdmin, sendTelegramMessage);
-      
-      case '/admin':
-        return handleAdminCommand(message, supabaseAdmin, sendTelegramMessage);
-      
-      default:
-        // Неизвестная команда
-        return sendTelegramMessage(
-          message.chat.id,
-          "Извините, я не распознал команду. Используйте одну из следующих команд: /start - начало работы, /new - создать новый сбор, /finish - завершить сбор, /cancel - отменить сбор, /paid - внести платеж, /history - история сборов, /help - справка.",
-          {
-            reply_markup: JSON.stringify({
-              keyboard: [
-                [{ text: '/new' }, { text: '/history' }],
-                [{ text: '/finish' }, { text: '/cancel' }],
-                [{ text: '/paid' }, { text: '/help' }],
-                [{ text: '/start' }]
-              ],
-              resize_keyboard: true
-            })
-          }
-        );
-    }
+      // Если команда прошла валидацию, обрабатываем её
+      switch(command) {
+        case '/start':
+          return handleStartCommand(message, supabaseAdmin, sendTelegramMessage);
+        
+        case '/help':
+          return handleHelpCommand(message, supabaseAdmin, sendTelegramMessage);
+        
+        case '/new':
+          return handleNewCommand(message, supabaseAdmin, sendTelegramMessage);
+        
+        case '/finish':
+          return handleFinishCommand(message, supabaseAdmin, sendTelegramMessage);
+        
+        case '/cancel':
+          return handleCancelCommand(message, supabaseAdmin, sendTelegramMessage);
+        
+        case '/paid':
+          return handlePaidCommand(message, supabaseAdmin, sendTelegramMessage);
+        
+        case '/history':
+          return handleHistoryCommand(message, supabaseAdmin, sendTelegramMessage);
+        
+        case '/admin':
+          return handleAdminCommand(message, supabaseAdmin, sendTelegramMessage);
+        
+        case '/setname':
+        case '/setdescription':
+        case '/setamount':
+        case '/setdate':
+        case '/approve':
+        case '/get':
+          // Команды, требующие контекста
+          return handleContextCommand(command, message, context, supabaseAdmin, sendTelegramMessage);
+        
+        default:
+          // Неизвестная команда
+          return sendTelegramMessage(
+            message.chat.id,
+            "Извините, я не распознал команду. Используйте /help для просмотра доступных команд.",
+            {
+              reply_markup: JSON.stringify({
+                keyboard: [
+                  [{ text: '/new' }, { text: '/history' }],
+                  [{ text: '/finish' }, { text: '/cancel' }],
+                  [{ text: '/paid' }, { text: '/help' }],
+                  [{ text: '/start' }]
+                ],
+                resize_keyboard: true
+              })
+            }
+          );
+      }
+    };
+    
+    // Запускаем асинхронную обработку
+    return processCommand();
   } catch (error) {
-    console.error(`Error handling command ${command}:`, error);
+    console.error("Error handling command:", error);
+    
     return sendTelegramMessage(
       message.chat.id,
-      "Произошла ошибка при обработке команды. Пожалуйста, попробуйте позже или обратитесь к администратору."
+      "❌ Произошла ошибка при обработке команды. Пожалуйста, попробуйте еще раз."
     );
   }
 }

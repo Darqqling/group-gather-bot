@@ -48,6 +48,13 @@ export interface DialogStateData {
   [key: string]: any;
 }
 
+// Интерфейс для хранения контекста сбора
+export interface CollectionContext {
+  collectionId: string;
+  status?: string;
+  title?: string;
+}
+
 /**
  * Установить состояние диалога для пользователя
  */
@@ -134,4 +141,77 @@ export async function isInDialogState(
 ): Promise<boolean> {
   const dialogState = await getDialogState(userId, supabaseAdmin);
   return dialogState.state === state;
+}
+
+/**
+ * Получить текущий контекст сбора для пользователя
+ */
+export async function getCollectionContext(
+  userId: string,
+  supabaseAdmin: any
+): Promise<CollectionContext | null> {
+  try {
+    const dialogState = await getDialogState(userId, supabaseAdmin);
+    
+    if (!dialogState || !dialogState.data || !dialogState.data.collectionContext) {
+      return null;
+    }
+    
+    return dialogState.data.collectionContext as CollectionContext;
+  } catch (error) {
+    console.error("Error getting collection context:", error);
+    return null;
+  }
+}
+
+/**
+ * Установить контекст сбора для пользователя
+ */
+export async function setCollectionContext(
+  userId: string,
+  context: CollectionContext,
+  supabaseAdmin: any
+): Promise<boolean> {
+  try {
+    const dialogState = await getDialogState(userId, supabaseAdmin);
+    
+    // Создаем или обновляем данные состояния
+    const data = dialogState && dialogState.data ? { ...dialogState.data } : {};
+    data.collectionContext = context;
+    
+    // Сохраняем контекст в текущем состоянии диалога
+    const state = dialogState && dialogState.state ? dialogState.state : DialogState.IDLE;
+    return await updateDialogData(userId, state, data, supabaseAdmin);
+  } catch (error) {
+    console.error("Error setting collection context:", error);
+    return false;
+  }
+}
+
+/**
+ * Очистить контекст сбора для пользователя
+ */
+export async function clearCollectionContext(
+  userId: string,
+  supabaseAdmin: any
+): Promise<boolean> {
+  try {
+    const dialogState = await getDialogState(userId, supabaseAdmin);
+    
+    // Если нет данных состояния, нечего очищать
+    if (!dialogState || !dialogState.data) {
+      return true;
+    }
+    
+    // Создаем копию данных без контекста сбора
+    const data = { ...dialogState.data };
+    delete data.collectionContext;
+    
+    // Сохраняем обновленные данные
+    const state = dialogState.state ? dialogState.state : DialogState.IDLE;
+    return await updateDialogData(userId, state, data, supabaseAdmin);
+  } catch (error) {
+    console.error("Error clearing collection context:", error);
+    return false;
+  }
 }

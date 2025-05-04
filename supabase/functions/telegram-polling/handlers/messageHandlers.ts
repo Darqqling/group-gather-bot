@@ -1,6 +1,8 @@
+
 // Message handlers for the Telegram bot
 import { saveUser, getUserState } from "../utils/databaseUtils.ts";
 import { handleCommand } from "../utils/commandHandler.ts";
+import { handleCallbackQuery } from "../utils/callbackHandler.ts";
 import { 
   DialogState, 
   resetDialogState 
@@ -75,6 +77,22 @@ export async function handleMessage(
       })
     }
   );
+}
+
+/**
+ * Handle callback queries from Telegram
+ */
+export function handleCallback(
+  callbackQuery: any,
+  supabaseAdmin: any,
+  sendTelegramMessage: Function
+) {
+  if (!callbackQuery) {
+    console.log("Invalid callback query format");
+    return;
+  }
+  
+  return handleCallbackQuery(callbackQuery, supabaseAdmin, sendTelegramMessage);
 }
 
 /**
@@ -186,9 +204,12 @@ export async function handleTelegramUpdates(supabaseAdmin: any) {
               sendTelegramMessage(chatId, text, { ...options, token: botToken })
           );
         } else if (update.callback_query) {
-          // Call the callback query handler if it exists
-          // This part would need to be implemented if needed
-          console.log("Callback query received but not handled in polling mode");
+          await handleCallback(
+            update.callback_query,
+            supabaseAdmin,
+            (chatId: number | string, text: string, options = {}) => 
+              sendTelegramMessage(chatId, text, { ...options, token: botToken })
+          );
         }
       } catch (updateError) {
         console.error("Error processing update:", updateError);
