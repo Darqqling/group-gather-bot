@@ -12,7 +12,7 @@ export interface Version {
 
 export async function getCurrentVersion(): Promise<Version | null> {
   try {
-    // Use the generic supabase.rpc approach which doesn't rely on table types
+    // Use the generic approach with proper type casting
     const { data, error } = await supabase
       .from('app_versions' as any)
       .select('*')
@@ -25,15 +25,16 @@ export async function getCurrentVersion(): Promise<Version | null> {
       return null;
     }
     
-    // Transform the data to match our Version interface
+    // Transform the data to match our Version interface with type assertion
     if (data) {
+      const typedData = data as any;
       return {
-        id: data.id,
-        version: data.version,
-        release_date: data.release_date,
-        changes: Array.isArray(data.changes) ? data.changes : [],
-        created_at: data.created_at,
-        created_by: data.created_by
+        id: typedData.id,
+        version: typedData.version,
+        release_date: typedData.release_date,
+        changes: Array.isArray(typedData.changes) ? typedData.changes : [],
+        created_at: typedData.created_at,
+        created_by: typedData.created_by
       } as Version;
     }
     
@@ -46,7 +47,7 @@ export async function getCurrentVersion(): Promise<Version | null> {
 
 export async function getAllVersions(): Promise<Version[]> {
   try {
-    // Use the generic approach to bypass type checking
+    // Use the generic approach with proper type casting
     const { data, error } = await supabase
       .from('app_versions' as any)
       .select('*')
@@ -57,15 +58,18 @@ export async function getAllVersions(): Promise<Version[]> {
       return [];
     }
     
-    // Transform the data to match our Version interface
-    return (data || []).map(item => ({
-      id: item.id,
-      version: item.version,
-      release_date: item.release_date,
-      changes: Array.isArray(item.changes) ? item.changes : [],
-      created_at: item.created_at,
-      created_by: item.created_by
-    } as Version));
+    // Transform the data to match our Version interface with type assertion
+    return (data || []).map(item => {
+      const typedItem = item as any;
+      return {
+        id: typedItem.id,
+        version: typedItem.version,
+        release_date: typedItem.release_date,
+        changes: Array.isArray(typedItem.changes) ? typedItem.changes : [],
+        created_at: typedItem.created_at,
+        created_by: typedItem.created_by
+      } as Version;
+    });
     
   } catch (error) {
     console.error('Exception fetching versions:', error);
