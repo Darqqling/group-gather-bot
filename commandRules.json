@@ -1,0 +1,92 @@
+{
+  "commands": {
+    "/start": {
+      "no_context": true
+    },
+    "/new": {
+      "no_context": true
+    },
+    "/setname": {
+      "no_context": false,
+      "available_states": [
+        "draft",
+        "active"
+      ]
+    },
+    "/setdescription": {
+      "no_context": false,
+      "available_states": [
+        "draft",
+        "active"
+      ]
+    },
+    "/setamount": {
+      "no_context": false,
+      "available_states": [
+        "draft",
+        "active"
+      ]
+    },
+    "/setdate": {
+      "no_context": false,
+      "available_states": [
+        "draft",
+        "active"
+      ]
+    },
+    "/approve": {
+      "no_context": false,
+      "available_states": [
+        "draft"
+      ]
+    },
+    "/cancel": {
+      "no_context": false,
+      "available_states": [
+        "draft",
+        "active"
+      ]
+    },
+    "/finish": {
+      "no_context": false,
+      "available_states": [
+        "active"
+      ]
+    },
+    "/paid": {
+      "no_context": false,
+      "available_states": [
+        "active"
+      ]
+    },
+    "/history": {
+      "no_context": true
+    },
+    "/get": {
+      "no_context": false,
+      "available_states": [
+        "draft",
+        "active",
+        "finished",
+        "cancelled"
+      ]
+    },
+    "/help": {
+      "no_context": true
+    }
+  },
+  "errors": {
+    "no_context_provided": {
+      "code": "NO_CONTEXT",
+      "message": "Выберите сбор."
+    },
+    "context_not_found": {
+      "code": "CONTEXT_NOT_FOUND",
+      "message": "Сбор не найден."
+    },
+    "invalid_status": {
+      "code": "INVALID_STATUS",
+      "message": "Сбор находится в статусе \"%s\", его можно %s."
+    }
+  }
+}
