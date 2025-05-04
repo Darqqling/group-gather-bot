@@ -2,13 +2,15 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { isPollingActive, startPolling, stopPolling } from "@/services/telegramPollingService";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const PollingStatus = () => {
   const [active, setActive] = useState<boolean>(false);
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [checkCount, setCheckCount] = useState<number>(0);
+  const { toast } = useToast();
 
   // Use effect to continuously check polling status
   useEffect(() => {
@@ -42,6 +44,16 @@ const PollingStatus = () => {
     }
   }, [active]);
 
+  // Handle errors from localStorage
+  useEffect(() => {
+    const error = localStorage.getItem('telegram_polling_error');
+    if (error) {
+      setLastError(error);
+      // Clear the error from localStorage to avoid showing it multiple times
+      localStorage.removeItem('telegram_polling_error');
+    }
+  }, [checkCount]);
+
   return (
     <div className="flex flex-col space-y-2">
       <div className="flex items-center space-x-2">
@@ -66,6 +78,13 @@ const PollingStatus = () => {
         <div className="flex items-center space-x-2 text-red-500 text-sm">
           <AlertCircle className="h-4 w-4" />
           <span>{lastError}</span>
+        </div>
+      )}
+      
+      {active && !lastError && (
+        <div className="flex items-center space-x-2 text-green-500 text-sm">
+          <CheckCircle className="h-4 w-4" />
+          <span>Опрос работает нормально</span>
         </div>
       )}
       

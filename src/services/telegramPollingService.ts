@@ -1,155 +1,142 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-// Interval in milliseconds between polling checks (default: 5 seconds)
-const DEFAULT_POLLING_INTERVAL = 5000;
+let pollingActive = false;
+let pollingTimeout: ReturnType<typeof setTimeout> | null = null;
+let pollingErrorCount = 0;
+const POLLING_RETRY_MAX = 5;
 
-// Store for the polling interval
-let pollingInterval: ReturnType<typeof setInterval> | null = null;
-let isPolling = false;
+export function isPollingActive(): boolean {
+  return pollingActive;
+}
 
-/**
- * Start polling for Telegram updates
- */
-export const startPolling = async (callback?: () => void, interval = DEFAULT_POLLING_INTERVAL) => {
-  if (isPolling) {
-    console.log("Polling already active");
-    return false;
-  }
-  
-  console.log(`Starting Telegram polling with interval ${interval}ms`);
-  
+export async function startPolling(): Promise<{ success: boolean, error?: string }> {
   try {
-    // First, ensure any webhooks are deleted
-    const webhookDeleted = await deleteWebhook();
-    console.log("Webhook deletion result:", webhookDeleted);
-    
-    // Only start polling if webhook was deleted successfully
-    if (!webhookDeleted.success) {
-      console.error("Failed to delete webhook before starting polling");
-      return false;
+    if (pollingActive) {
+      console.log("Polling already active, not starting again");
+      return { success: true };
     }
-    
-    isPolling = true;
-    
-    // Clear any existing interval
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
+
+    console.log("Starting Telegram polling...");
+    pollingErrorCount = 0;
+
+    // Make sure to clear existing timeouts
+    if (pollingTimeout) {
+      clearTimeout(pollingTimeout);
+      pollingTimeout = null;
     }
-    
-    // Initial poll
-    const initialPollResult = await pollUpdates();
-    if (!initialPollResult) {
-      console.error("Initial poll failed, stopping polling");
-      stopPolling();
-      return false;
+
+    // Reset any local storage errors
+    localStorage.removeItem('telegram_polling_error');
+
+    // Call the polling function and start the polling cycle
+    const result = await pollTelegram();
+
+    if (!result.success) {
+      console.error("Initial polling failed:", result.error);
+      localStorage.setItem('telegram_polling_error', result.error || 'Не удалось запустить опрос');
+      pollingActive = false;
+      return { success: false, error: result.error };
     }
-    
-    // Set interval for subsequent polls
-    pollingInterval = setInterval(async () => {
-      const success = await pollUpdates();
-      if (!success) {
-        console.warn("Poll failed, but continuing with next interval");
-      }
-      if (callback) callback();
-    }, interval);
-    
-    return true;
+
+    pollingActive = true;
+    scheduleTelegramPolling();
+    return { success: true };
+
   } catch (error) {
-    console.error("Exception in startPolling:", error);
-    isPolling = false;
-    return false;
+    console.error("Error starting Telegram polling:", error);
+    localStorage.setItem('telegram_polling_error', error.message || 'Неизвестная ошибка при запуске опроса');
+    pollingActive = false;
+    return { success: false, error: error.message || 'Неизвестная ошибка при запуске опроса' };
   }
-};
+}
 
-/**
- * Stop polling for Telegram updates
- */
-export const stopPolling = () => {
-  console.log("Stopping Telegram polling");
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-    pollingInterval = null;
+export function stopPolling(): void {
+  console.log("Stopping Telegram polling...");
+  pollingActive = false;
+
+  if (pollingTimeout) {
+    clearTimeout(pollingTimeout);
+    pollingTimeout = null;
   }
-  isPolling = false;
-};
+}
 
-/**
- * Reset the update ID to start polling from the beginning
- */
-export const resetPolling = async (): Promise<boolean> => {
+async function pollTelegram(): Promise<{ success: boolean, error?: string }> {
   try {
+    // Call the Edge function to process Telegram updates
     const { data, error } = await supabase.functions.invoke('telegram-polling', {
-      method: 'POST',
-      body: { action: 'reset' },
-    });
-    
-    if (error) {
-      console.error("Error resetting polling:", error);
-      return false;
-    }
-    
-    console.log("Polling reset successful:", data);
-    return data?.success === true;
-  } catch (error) {
-    console.error("Exception resetting polling:", error);
-    return false;
-  }
-};
-
-/**
- * Explicitly delete any existing webhook
- */
-export const deleteWebhook = async (): Promise<{success: boolean, result?: any, error?: string}> => {
-  try {
-    // Use the telegram-polling function to delete any webhook
-    const { data, error } = await supabase.functions.invoke('telegram-polling', {
-      method: 'POST',
-      body: { action: 'deleteWebhook' },
-    });
-    
-    if (error) {
-      console.error("Error deleting webhook:", error);
-      return { success: false, error: error.message };
-    }
-    
-    console.log("Webhook deletion result:", data);
-    return { success: data?.success === true, result: data };
-  } catch (error: any) {
-    console.error("Exception deleting webhook:", error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Check if polling is currently active
- */
-export const isPollingActive = (): boolean => {
-  return isPolling;
-};
-
-/**
- * Poll for Telegram updates
- */
-async function pollUpdates() {
-  try {
-    const { data, error } = await supabase.functions.invoke('telegram-polling', {
-      method: 'POST',
       body: { action: 'process' },
     });
-    
+
     if (error) {
-      console.error("Error polling updates:", error);
-      return false;
+      pollingErrorCount++;
+      console.error(`Telegram polling error (attempt ${pollingErrorCount}):`, error);
+
+      if (pollingErrorCount >= POLLING_RETRY_MAX) {
+        localStorage.setItem('telegram_polling_error', 
+          `Превышено количество попыток опроса (${pollingErrorCount}). Проверьте настройки бота и логи.`);
+        stopPolling();
+        return { success: false, error: `Превышено количество попыток опроса (${pollingErrorCount})` };
+      }
+      
+      return { success: false, error: error.message || 'Error during polling' };
     }
-    
-    if (data && data.updates > 0) {
-      console.log(`Processed ${data.updates} updates, new lastUpdateId: ${data.lastUpdateId}`);
+
+    // Reset error count on success
+    if (pollingErrorCount > 0) {
+      console.log("Polling successful after errors, resetting error count");
+      pollingErrorCount = 0;
     }
-    
-    return data?.success;
+
+    console.log("Telegram polling successful:", data);
+    return { success: true };
+
   } catch (error) {
-    console.error("Exception polling updates:", error);
-    return false;
+    pollingErrorCount++;
+    console.error(`Telegram polling exception (attempt ${pollingErrorCount}):`, error);
+
+    if (pollingErrorCount >= POLLING_RETRY_MAX) {
+      localStorage.setItem('telegram_polling_error', 
+        `Превышено количество попыток опроса (${pollingErrorCount}). Проверьте настройки бота и логи.`);
+      stopPolling();
+      return { success: false, error: `Превышено количество попыток опроса (${pollingErrorCount})` };
+    }
+    
+    return { success: false, error: error.message || 'Exception during polling' };
   }
+}
+
+function scheduleTelegramPolling() {
+  if (!pollingActive) {
+    console.log("Polling disabled, not scheduling next poll");
+    return;
+  }
+
+  pollingTimeout = setTimeout(async () => {
+    if (!pollingActive) {
+      console.log("Polling disabled before timeout, not polling");
+      return;
+    }
+
+    try {
+      const result = await pollTelegram();
+      
+      if (!result.success) {
+        console.warn("Polling failed, but continuing to try:", result.error);
+      }
+    } catch (error) {
+      console.error("Error during scheduled polling:", error);
+    }
+
+    // Schedule the next poll regardless of success/failure
+    // As long as we haven't hit the maximum retry limit
+    if (pollingActive && pollingErrorCount < POLLING_RETRY_MAX) {
+      scheduleTelegramPolling();
+    } else if (pollingErrorCount >= POLLING_RETRY_MAX) {
+      console.error(`Stopping polling due to too many errors (${pollingErrorCount})`);
+      localStorage.setItem('telegram_polling_error', 
+        `Превышено количество попыток опроса (${pollingErrorCount}). Проверьте настройки бота и логи.`);
+      stopPolling();
+    }
+  }, 5000); // Poll every 5 seconds
 }

@@ -1,147 +1,74 @@
 
 /**
- * Утилиты для работы с коллекциями
+ * Утилиты для работы со сборами средств
  */
-
-import { DialogState, CollectionCreationData, CollectionCreationStep, setDialogState } from "./dialogStateManager.ts";
 
 /**
- * Обновление состояния создания коллекции
+ * Создание нового сбора
  */
-export async function updateCollectionState(
-  supabaseAdmin: any,
-  userId: string,
-  stateData: CollectionCreationData
-) {
+export async function createCollection(supabaseAdmin: any, collectionData: any) {
   try {
-    return await setDialogState(userId, DialogState.CREATING_COLLECTION, stateData, supabaseAdmin);
-  } catch (error) {
-    console.error("Error updating collection state:", error);
-    throw error;
-  }
-}
-
-/**
- * Создание новой коллекции
- */
-export async function createCollection(
-  supabaseAdmin: any,
-  collection: any
-) {
-  try {
-    console.log("Creating collection:", collection);
+    console.log("Creating collection:", collectionData);
     
+    // Валидация обязательных полей
+    if (!collectionData.title) {
+      return { success: false, error: "Название сбора не указано" };
+    }
+    
+    if (!collectionData.target_amount || isNaN(collectionData.target_amount) || collectionData.target_amount <= 0) {
+      return { success: false, error: "Некорректная целевая сумма сбора" };
+    }
+    
+    if (!collectionData.deadline) {
+      return { success: false, error: "Дедлайн сбора не указан" };
+    }
+    
+    const deadline = new Date(collectionData.deadline);
+    if (isNaN(deadline.getTime())) {
+      return { success: false, error: "Некорректная дата дедлайна" };
+    }
+    
+    if (!collectionData.creator_id) {
+      return { success: false, error: "ID создателя сбора не указан" };
+    }
+    
+    // Создаем сбор
     const { data, error } = await supabaseAdmin
       .from("collections")
-      .insert(collection)
-      .select()
-      .maybeSingle();
+      .insert([{
+        title: collectionData.title,
+        description: collectionData.description || "",
+        target_amount: collectionData.target_amount,
+        current_amount: 0,
+        deadline: collectionData.deadline,
+        creator_id: collectionData.creator_id,
+        status: "active"
+      }])
+      .select();
     
     if (error) {
-      console.error("Error creating collection:", error);
+      console.error("Error creating collection in database:", error);
       return { success: false, error: error.message };
     }
     
-    return { success: true, collection: data };
+    console.log("Collection created successfully:", data);
+    return { success: true, collection: data[0] };
   } catch (error) {
     console.error("Exception creating collection:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message || "Неизвестная ошибка при создании сбора" };
   }
 }
 
 /**
- * Обновление статуса коллекции
+ * Получение всех сборов пользователя
  */
-export async function updateCollectionStatus(
-  supabaseAdmin: any,
-  collectionId: string,
-  status: string
-) {
+export async function getUserCollections(supabaseAdmin: any, userId: string, status: string | null = null) {
   try {
-    console.log(`Updating collection ${collectionId} status to ${status}`);
+    console.log(`Getting collections for user ${userId} with status ${status || "all"}`);
     
-    const { error } = await supabaseAdmin
-      .from("collections")
-      .update({
-        status,
-        last_updated_at: new Date().toISOString()
-      })
-      .eq("id", collectionId);
-    
-    if (error) {
-      console.error("Error updating collection status:", error);
-      return { success: false, error: error.message };
-    }
-    
-    return { success: true };
-  } catch (error) {
-    console.error("Exception updating collection status:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Получение коллекции по ID
- */
-export async function getCollectionById(
-  collectionId: string,
-  supabaseAdmin: any
-) {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("collections")
-      .select(`
-        id, 
-        title, 
-        description, 
-        creator_id, 
-        target_amount, 
-        current_amount, 
-        status, 
-        deadline,
-        telegram_users!collections_creator_id_fkey (
-          telegram_id,
-          first_name,
-          last_name,
-          username
-        )
-      `)
-      .eq("id", collectionId)
-      .maybeSingle();
-    
-    if (error) {
-      console.error("Error fetching collection:", error);
-      return null;
-    }
-    
-    return data;
-  } catch (error) {
-    console.error("Exception fetching collection:", error);
-    return null;
-  }
-}
-
-/**
- * Получение коллекций пользователя
- */
-export async function getUserCollections(
-  supabaseAdmin: any,
-  userId: string,
-  status: string | null = null
-) {
-  try {
     let query = supabaseAdmin
       .from("collections")
-      .select(`
-        id, 
-        title, 
-        description, 
-        creator_id, 
-        target_amount, 
-        current_amount, 
-        status, 
-        deadline
-      `)
+      .select("*")
       .eq("creator_id", userId)
       .order('created_at', { ascending: false });
     
@@ -156,36 +83,24 @@ export async function getUserCollections(
       return { success: false, error: error.message };
     }
     
+    console.log(`Retrieved ${data?.length || 0} collections`);
     return { success: true, collections: data };
   } catch (error) {
     console.error("Exception fetching user collections:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message || "Неизвестная ошибка при получении сборов" };
   }
 }
 
 /**
- * Получение активных коллекций
+ * Получение всех активных сборов
  */
 export async function getActiveCollections(supabaseAdmin: any) {
   try {
+    console.log("Getting all active collections");
+    
     const { data, error } = await supabaseAdmin
       .from("collections")
-      .select(`
-        id, 
-        title, 
-        description, 
-        creator_id, 
-        target_amount, 
-        current_amount, 
-        status, 
-        deadline,
-        telegram_users!collections_creator_id_fkey (
-          telegram_id,
-          first_name,
-          last_name,
-          username
-        )
-      `)
+      .select("*")
       .eq("status", "active")
       .order('created_at', { ascending: false });
     
@@ -194,128 +109,206 @@ export async function getActiveCollections(supabaseAdmin: any) {
       return { success: false, error: error.message };
     }
     
+    console.log(`Retrieved ${data?.length || 0} active collections`);
     return { success: true, collections: data };
   } catch (error) {
     console.error("Exception fetching active collections:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message || "Неизвестная ошибка при получении активных сборов" };
   }
 }
 
 /**
- * Регистрация платежа
+ * Получение сбора по ID
  */
-export async function recordPayment(
-  supabaseAdmin: any,
-  collectionId: string,
-  userId: string,
-  amount: number
-) {
+export async function getCollection(supabaseAdmin: any, collectionId: string) {
   try {
-    console.log(`Recording payment of ${amount} by user ${userId} for collection ${collectionId}`);
+    console.log(`Getting collection with ID ${collectionId}`);
     
     const { data, error } = await supabaseAdmin
+      .from("collections")
+      .select("*")
+      .eq("id", collectionId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Error fetching collection:", error);
+      return { success: false, error: error.message };
+    }
+    
+    if (!data) {
+      return { success: false, error: "Сбор не найден" };
+    }
+    
+    return { success: true, collection: data };
+  } catch (error) {
+    console.error("Exception fetching collection:", error);
+    return { success: false, error: error.message || "Неизвестная ошибка при получении сбора" };
+  }
+}
+
+/**
+ * Обновление статуса сбора
+ */
+export async function updateCollectionStatus(supabaseAdmin: any, collectionId: string, newStatus: string) {
+  try {
+    console.log(`Updating collection ${collectionId} status to ${newStatus}`);
+    
+    if (!["active", "finished", "cancelled"].includes(newStatus)) {
+      return { success: false, error: "Некорректный статус сбора" };
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from("collections")
+      .update({ 
+        status: newStatus,
+        last_updated_at: new Date().toISOString()
+      })
+      .eq("id", collectionId)
+      .select();
+    
+    if (error) {
+      console.error("Error updating collection status:", error);
+      return { success: false, error: error.message };
+    }
+    
+    console.log("Collection status updated successfully:", data);
+    return { success: true, collection: data[0] };
+  } catch (error) {
+    console.error("Exception updating collection status:", error);
+    return { success: false, error: error.message || "Неизвестная ошибка при обновлении статуса сбора" };
+  }
+}
+
+/**
+ * Запись платежа
+ */
+export async function recordPayment(supabaseAdmin: any, collectionId: string, userId: string, amount: number) {
+  try {
+    console.log(`Recording payment from user ${userId} for collection ${collectionId} amount ${amount}`);
+    
+    if (!collectionId) {
+      return { success: false, error: "ID сбора не указан" };
+    }
+    
+    if (!userId) {
+      return { success: false, error: "ID пользователя не указан" };
+    }
+    
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return { success: false, error: "Некорректная сумма платежа" };
+    }
+    
+    // Проверяем, что сбор существует и активен
+    const collection = await getCollection(supabaseAdmin, collectionId);
+    
+    if (!collection.success || !collection.collection) {
+      return { success: false, error: collection.error || "Сбор не найден" };
+    }
+    
+    if (collection.collection.status !== "active") {
+      return { success: false, error: `Сбор не является активным (текущий статус: ${collection.collection.status})` };
+    }
+    
+    // Записываем платеж
+    const { data, error } = await supabaseAdmin
       .from("payments")
-      .insert({
+      .insert([{
         collection_id: collectionId,
         user_id: userId,
-        amount,
-        status: "pending" // Ожидает подтверждения организатором
-      })
-      .select()
-      .maybeSingle();
+        amount: amount,
+        status: "confirmed",
+        confirmed_at: new Date().toISOString()
+      }])
+      .select();
     
     if (error) {
       console.error("Error recording payment:", error);
       return { success: false, error: error.message };
     }
     
-    return { success: true, payment: data };
+    console.log("Payment recorded successfully:", data);
+    return { success: true, payment: data[0] };
   } catch (error) {
     console.error("Exception recording payment:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message || "Неизвестная ошибка при записи платежа" };
   }
 }
 
 /**
- * Обновление суммы коллекции
+ * Обновление суммы сбора
  */
-export async function updateCollectionAmount(
-  supabaseAdmin: any,
-  collectionId: string,
-  amount: number
-) {
+export async function updateCollectionAmount(supabaseAdmin: any, collectionId: string, amount: number) {
   try {
     console.log(`Updating collection ${collectionId} amount by ${amount}`);
     
-    // Получаем текущую сумму
-    const { data, error: selectError } = await supabaseAdmin
-      .from("collections")
-      .select("current_amount")
-      .eq("id", collectionId)
-      .maybeSingle();
+    const collection = await getCollection(supabaseAdmin, collectionId);
     
-    if (selectError) {
-      console.error("Error fetching collection amount:", selectError);
-      return { success: false, error: selectError.message };
+    if (!collection.success || !collection.collection) {
+      return { success: false, error: collection.error || "Сбор не найден" };
     }
     
-    const currentAmount = data?.current_amount || 0;
+    const currentAmount = collection.collection.current_amount || 0;
     const newAmount = currentAmount + amount;
     
-    // Обновляем сумму
-    const { error: updateError } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("collections")
-      .update({
+      .update({ 
         current_amount: newAmount,
         last_updated_at: new Date().toISOString()
       })
-      .eq("id", collectionId);
+      .eq("id", collectionId)
+      .select();
     
-    if (updateError) {
-      console.error("Error updating collection amount:", updateError);
-      return { success: false, error: updateError.message };
+    if (error) {
+      console.error("Error updating collection amount:", error);
+      return { success: false, error: error.message };
     }
     
-    return { success: true, newAmount };
+    console.log("Collection amount updated successfully:", data);
+    
+    // Если цель сбора достигнута, можно автоматически завершить сбор
+    if (newAmount >= collection.collection.target_amount) {
+      console.log(`Collection ${collectionId} target amount reached, automatically finishing`);
+      // Раскомментировать если нужно автоматическое завершение
+      // await updateCollectionStatus(supabaseAdmin, collectionId, "finished");
+    }
+    
+    return { success: true, collection: data[0] };
   } catch (error) {
     console.error("Exception updating collection amount:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message || "Неизвестная ошибка при обновлении суммы сбора" };
   }
 }
 
 /**
- * Получение платежей коллекции
+ * Получение платежей для сбора
  */
-export async function getCollectionPayments(
-  collectionId: string,
-  supabaseAdmin: any
-) {
+export async function getCollectionPayments(supabaseAdmin: any, collectionId: string) {
   try {
+    console.log(`Getting payments for collection ${collectionId}`);
+    
     const { data, error } = await supabaseAdmin
       .from("payments")
       .select(`
-        id, 
-        amount, 
-        status, 
-        created_at, 
+        id,
+        amount,
+        status,
         confirmed_at,
-        telegram_users!payments_user_id_fkey (
-          telegram_id,
-          first_name,
-          last_name,
-          username
-        )
+        created_at,
+        telegram_users(first_name, last_name, username)
       `)
-      .eq("collection_id", collectionId);
+      .eq("collection_id", collectionId)
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error("Error fetching collection payments:", error);
-      return null;
+      return { success: false, error: error.message };
     }
     
-    return data;
+    console.log(`Retrieved ${data?.length || 0} payments`);
+    return { success: true, payments: data };
   } catch (error) {
     console.error("Exception fetching collection payments:", error);
-    return null;
+    return { success: false, error: error.message || "Неизвестная ошибка при получении платежей сбора" };
   }
 }
