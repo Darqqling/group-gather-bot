@@ -61,6 +61,35 @@ export function stopPolling(): void {
   }
 }
 
+// Add the missing resetPolling function
+export async function resetPolling(): Promise<boolean> {
+  console.log("Resetting Telegram polling state...");
+  
+  try {
+    // Reset error count
+    pollingErrorCount = 0;
+    
+    // Clear any stored errors
+    localStorage.removeItem('telegram_polling_error');
+    
+    // Call edge function to reset update ID if needed
+    const { error } = await supabase.functions.invoke('telegram-polling', {
+      body: { action: 'reset' },
+    });
+    
+    if (error) {
+      console.error("Error resetting polling:", error);
+      return false;
+    }
+    
+    console.log("Polling state reset successfully");
+    return true;
+  } catch (error) {
+    console.error("Exception resetting polling:", error);
+    return false;
+  }
+}
+
 async function pollTelegram(): Promise<{ success: boolean, error?: string }> {
   try {
     // Call the Edge function to process Telegram updates
