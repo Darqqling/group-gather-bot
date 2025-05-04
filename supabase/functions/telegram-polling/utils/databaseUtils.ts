@@ -101,6 +101,29 @@ export async function updateUserState(
 }
 
 /**
+ * Check if user is admin
+ */
+export async function isUserAdmin(userId: string, supabaseAdmin: any) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "admin_users")
+      .single();
+    
+    if (error || !data) {
+      return false;
+    }
+    
+    const adminUsers = data.value.split(',').map((id: string) => id.trim());
+    return adminUsers.includes(userId);
+  } catch (error) {
+    console.error("Exception checking admin status:", error);
+    return false;
+  }
+}
+
+/**
  * Log an error to the database
  */
 export async function logError(

@@ -14,36 +14,52 @@ let isPolling = false;
 export const startPolling = async (callback?: () => void, interval = DEFAULT_POLLING_INTERVAL) => {
   if (isPolling) {
     console.log("Polling already active");
-    return;
+    return false;
   }
   
   console.log(`Starting Telegram polling with interval ${interval}ms`);
   
-  // First, ensure any webhooks are deleted
-  const webhookDeleted = await deleteWebhook();
-  console.log("Webhook deletion result:", webhookDeleted);
-  
-  // Only start polling if webhook was deleted successfully
-  if (!webhookDeleted.success) {
-    console.error("Failed to delete webhook before starting polling");
-    return;
+  try {
+    // First, ensure any webhooks are deleted
+    const webhookDeleted = await deleteWebhook();
+    console.log("Webhook deletion result:", webhookDeleted);
+    
+    // Only start polling if webhook was deleted successfully
+    if (!webhookDeleted.success) {
+      console.error("Failed to delete webhook before starting polling");
+      return false;
+    }
+    
+    isPolling = true;
+    
+    // Clear any existing interval
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+    }
+    
+    // Initial poll
+    const initialPollResult = await pollUpdates();
+    if (!initialPollResult) {
+      console.error("Initial poll failed, stopping polling");
+      stopPolling();
+      return false;
+    }
+    
+    // Set interval for subsequent polls
+    pollingInterval = setInterval(async () => {
+      const success = await pollUpdates();
+      if (!success) {
+        console.warn("Poll failed, but continuing with next interval");
+      }
+      if (callback) callback();
+    }, interval);
+    
+    return true;
+  } catch (error) {
+    console.error("Exception in startPolling:", error);
+    isPolling = false;
+    return false;
   }
-  
-  isPolling = true;
-  
-  // Clear any existing interval
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-  }
-  
-  // Initial poll
-  await pollUpdates();
-  
-  // Set interval for subsequent polls
-  pollingInterval = setInterval(async () => {
-    await pollUpdates();
-    if (callback) callback();
-  }, interval);
 };
 
 /**
