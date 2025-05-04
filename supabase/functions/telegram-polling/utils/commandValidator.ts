@@ -3,8 +3,8 @@
  * Модуль валидации команд на основе правил из commandRules.json
  */
 
-// Fix the import path to use a relative path from the current file
-import commandRules from "../../../commandRules.json" assert { type: "json" };
+// Import from the local directory rather than trying to reach outside
+import commandRules from "../commandRules.json" assert { type: "json" };
 
 // Типы для результатов валидации
 export interface ValidationResult {
