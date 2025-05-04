@@ -1,4 +1,3 @@
-
 /**
  * Обработчики команд для Telegram бота
  */
@@ -254,46 +253,63 @@ export async function handleHistoryCommand(
   supabaseAdmin: any,
   sendTelegramMessage: Function
 ) {
-  const userId = message.from.id.toString();
-  
-  // Получаем все сборы пользователя
-  const result = await getUserCollections(supabaseAdmin, userId);
-  
-  if (!result.success) {
-    return sendTelegramMessage(
+  try {
+    console.log(`Handling history command for user ${message.from.id}`);
+    
+    // Fetch user collections with improved error handling
+    const result = await getUserCollections(supabaseAdmin, message.from.id.toString());
+    
+    if (!result.success) {
+      console.error("Error fetching user collections:", result.error);
+      await sendTelegramMessage(
+        message.chat.id,
+        `Не удалось получить историю сборов: ${result.error}. Пожалуйста, попробуйте позже.`
+      );
+      return;
+    }
+    
+    const collections = result.collections || [];
+    
+    if (collections.length === 0) {
+      await sendTelegramMessage(
+        message.chat.id,
+        "У вас пока нет созданных сборов."
+      );
+      return;
+    }
+    
+    let historyText = "Ваши сборы:\n";
+    
+    for (const [index, collection] of collections.entries()) {
+      const status = collection.status === 'active' 
+        ? 'Активен' 
+        : collection.status === 'finished' 
+          ? 'Завершён' 
+          : 'Отменён';
+      
+      historyText += `${index + 1}. ${collection.title} (${status}) — `;
+      
+      if (collection.status === 'active') {
+        historyText += `${collection.target_amount} руб. до ${new Date(collection.deadline).toLocaleDateString('ru-RU')}`;
+      } else {
+        historyText += `собрано ${collection.current_amount || 0} руб.`;
+      }
+      
+      historyText += "\n";
+    }
+    
+    await sendTelegramMessage(
+      message.chat.id,
+      historyText
+    );
+    console.log("Successfully sent history to user");
+  } catch (error) {
+    console.error("Exception handling history command:", error);
+    await sendTelegramMessage(
       message.chat.id,
       "Произошла ошибка при получении истории сборов. Пожалуйста, попробуйте позже."
     );
   }
-  
-  if (!result.collections || result.collections.length === 0) {
-    return sendTelegramMessage(
-      message.chat.id,
-      "У вас еще нет созданных сборов."
-    );
-  }
-  
-  // Форматируем список сборов для отображения
-  const collectionsText = result.collections.map((collection, index) => {
-    const status = {
-      active: "🟢 Активен",
-      finished: "✅ Завершен",
-      cancelled: "❌ Отменен"
-    }[collection.status] || collection.status;
-    
-    const deadline = new Date(collection.deadline).toLocaleDateString('ru-RU');
-    
-    return `${index + 1}. *${collection.title}*\n` +
-      `Статус: ${status}\n` +
-      `Сумма: ${collection.current_amount || 0}/${collection.target_amount} руб.\n` +
-      `Дедлайн: ${deadline}\n`;
-  }).join("\n");
-  
-  return sendTelegramMessage(
-    message.chat.id,
-    `*Ваши сборы:*\n\n${collectionsText}`,
-    { parse_mode: "Markdown" }
-  );
 }
 
 /**
@@ -386,13 +402,14 @@ export function handleCommand(
         // Неизвестная команда
         return sendTelegramMessage(
           message.chat.id,
-          "Извините, я не распознал команду. Используйте /start для просмотра доступных команд.",
+          "Извините, я не распознал команду. Используйте одну из следующих команд: /start - начало работы, /new - создать новый сбор, /finish - завершить сбор, /cancel - отменить сбор, /paid - внести платеж, /history - история сборов, /help - справка.",
           {
             reply_markup: JSON.stringify({
               keyboard: [
                 [{ text: '/new' }, { text: '/history' }],
                 [{ text: '/finish' }, { text: '/cancel' }],
-                [{ text: '/paid' }, { text: '/start' }]
+                [{ text: '/paid' }, { text: '/help' }],
+                [{ text: '/start' }]
               ],
               resize_keyboard: true
             })
@@ -400,11 +417,10 @@ export function handleCommand(
         );
     }
   } catch (error) {
-    console.error("Error handling command:", error);
-    
+    console.error(`Error handling command ${command}:`, error);
     return sendTelegramMessage(
       message.chat.id,
-      "Произошла ошибка при обработке команды. Пожалуйста, попробуйте еще раз."
+      "Произошла ошибка при обработке команды. Пожалуйста, попробуйте позже или обратитесь к администратору."
     );
   }
 }

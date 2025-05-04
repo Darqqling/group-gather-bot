@@ -30,7 +30,12 @@ export async function handleMessage(
   const userId = message.from.id.toString();
   
   // Сохраняем или обновляем информацию о пользователе
-  await saveUser(message.from, supabaseAdmin);
+  try {
+    await saveUser(message.from, supabaseAdmin);
+  } catch (error) {
+    console.error("Error saving user:", error);
+    // Continue processing even if user save fails
+  }
   
   // Проверяем состояние пользователя (находится ли он в диалоге)
   const userState = await getUserState(userId, supabaseAdmin);
@@ -56,14 +61,23 @@ export async function handleMessage(
       
       default:
         // Сбрасываем неизвестное состояние
+        console.log(`Resetting unknown state for user ${userId}: ${userState.state}`);
         await resetDialogState(userId, supabaseAdmin);
     }
   }
 
-  // Стандартный ответ на нераспознанные сообщения
+  // Улучшенный ответ на нераспознанные сообщения
   return sendTelegramMessage(
     message.chat.id,
-    "Извините, я не распознал команду. Используйте /start для просмотра доступных команд.",
+    "Извините, я не распознал ваше сообщение. Вот что я умею делать:\n" +
+    "/start - начало работы\n" +
+    "/new - создать новый сбор\n" +
+    "/finish - завершить активный сбор\n" +
+    "/cancel - отменить активный сбор\n" +
+    "/paid - внести платеж в активный сбор\n" +
+    "/history - посмотреть историю своих сборов\n" +
+    "/help - показать справку\n\n" +
+    "Выберите одну из команд ниже:",
     {
       reply_markup: JSON.stringify({
         keyboard: [

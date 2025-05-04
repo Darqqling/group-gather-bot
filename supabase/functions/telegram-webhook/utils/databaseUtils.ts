@@ -1,4 +1,3 @@
-
 // Database utilities for the Telegram bot
 
 /**
@@ -37,6 +36,37 @@ export async function saveUser(user: any, supabaseAdmin: any) {
   } catch (error) {
     console.error("Exception saving user:", error);
     throw error;
+  }
+}
+
+/**
+ * Get user UUID by Telegram ID
+ */
+export async function getUserUuidByTelegramId(telegramId: string, supabaseAdmin: any) {
+  try {
+    console.log(`Getting user UUID for Telegram ID: ${telegramId}`);
+    
+    const { data, error } = await supabaseAdmin
+      .from("telegram_users")
+      .select("id")
+      .eq("telegram_id", telegramId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Error getting user UUID:", error);
+      return null;
+    }
+    
+    if (!data) {
+      console.log(`User with Telegram ID ${telegramId} not found`);
+      return null;
+    }
+    
+    console.log(`Found UUID ${data.id} for Telegram ID ${telegramId}`);
+    return data.id;
+  } catch (error) {
+    console.error("Exception getting user UUID:", error);
+    return null;
   }
 }
 

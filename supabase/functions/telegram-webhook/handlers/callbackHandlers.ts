@@ -37,120 +37,156 @@ export async function handleCallbackQuery(
     
     // Обработка отмены создания сбора
     if (data === 'cancel_creation') {
-      await resetDialogState(userId, supabaseAdmin);
-      
-      await answerCallbackQuery(callbackQuery.id, "Создание сбора отменено");
-      
-      await sendTelegramMessage(
-        chatId,
-        "Создание сбора отменено.",
-        {
-          reply_markup: JSON.stringify({
-            keyboard: [
-              [{ text: '/new' }, { text: '/history' }],
-              [{ text: '/finish' }, { text: '/cancel' }],
-              [{ text: '/paid' }, { text: '/start' }]
-            ],
-            resize_keyboard: true
-          })
-        }
-      );
-      return;
+      console.log('Handling cancel_creation callback');
+      try {
+        await resetDialogState(userId, supabaseAdmin);
+        
+        await answerCallbackQuery(callbackQuery.id, "Создание сбора отменено");
+        
+        await sendTelegramMessage(
+          chatId,
+          "Создание сбора отменено.",
+          {
+            reply_markup: JSON.stringify({
+              keyboard: [
+                [{ text: '/new' }, { text: '/history' }],
+                [{ text: '/finish' }, { text: '/cancel' }],
+                [{ text: '/paid' }, { text: '/start' }]
+              ],
+              resize_keyboard: true
+            })
+          }
+        );
+        console.log('Successfully handled cancel_creation callback');
+        return;
+      } catch (error) {
+        console.error('Error handling cancel_creation callback:', error);
+        await answerCallbackQuery(callbackQuery.id, "Ошибка при отмене создания сбора");
+        await sendTelegramMessage(chatId, "Произошла ошибка при отмене создания сбора. Пожалуйста, попробуйте снова с командой /start");
+        return;
+      }
     }
     
     // Обработка отмены платежа
     if (data === 'cancel_payment') {
-      await resetDialogState(userId, supabaseAdmin);
-      
-      await answerCallbackQuery(callbackQuery.id, "Платеж отменен");
-      
-      await sendTelegramMessage(
-        chatId,
-        "Платеж отменен.",
-        {
-          reply_markup: JSON.stringify({
-            keyboard: [
-              [{ text: '/new' }, { text: '/history' }],
-              [{ text: '/finish' }, { text: '/cancel' }],
-              [{ text: '/paid' }, { text: '/start' }]
-            ],
-            resize_keyboard: true
-          })
-        }
-      );
-      return;
+      console.log('Handling cancel_payment callback');
+      try {
+        await resetDialogState(userId, supabaseAdmin);
+        
+        await answerCallbackQuery(callbackQuery.id, "Платеж отменен");
+        
+        await sendTelegramMessage(
+          chatId,
+          "Платеж отменен.",
+          {
+            reply_markup: JSON.stringify({
+              keyboard: [
+                [{ text: '/new' }, { text: '/history' }],
+                [{ text: '/finish' }, { text: '/cancel' }],
+                [{ text: '/paid' }, { text: '/start' }]
+              ],
+              resize_keyboard: true
+            })
+          }
+        );
+        console.log('Successfully handled cancel_payment callback');
+        return;
+      } catch (error) {
+        console.error('Error handling cancel_payment callback:', error);
+        await answerCallbackQuery(callbackQuery.id, "Ошибка при отмене платежа");
+        await sendTelegramMessage(chatId, "Произошла ошибка при отмене платежа. Пожалуйста, попробуйте снова с командой /start");
+        return;
+      }
     }
     
     // Обработка навигации между шагами создания сбора
     if (data === 'creation_back_to_description') {
-      const dialogState = await getDialogState(userId, supabaseAdmin);
-      
-      if (dialogState.state === DialogState.CREATING_COLLECTION && dialogState.data) {
-        console.log("Going back to description step");
-        const newStateData = {
-          ...dialogState.data,
-          step: CollectionCreationStep.DESCRIPTION
-        };
+      console.log('Handling back_to_description callback');
+      try {
+        const dialogState = await getDialogState(userId, supabaseAdmin);
         
-        await setDialogState(userId, DialogState.CREATING_COLLECTION, newStateData, supabaseAdmin);
-        
-        await answerCallbackQuery(callbackQuery.id, "Возврат к предыдущему шагу");
-        
-        await sendTelegramMessage(
-          chatId,
-          `Текущее описание: "${dialogState.data.description || ''}"\nВведите новое описание:`,
-          {
-            reply_markup: JSON.stringify({
-              inline_keyboard: [
-                [{ text: "Отменить создание", callback_data: "cancel_creation" }]
-              ]
-            })
-          }
-        );
-      } else {
-        await answerCallbackQuery(callbackQuery.id, "Невозможно вернуться: диалог не найден");
-        await resetDialogState(userId, supabaseAdmin);
-        await sendTelegramMessage(
-          chatId, 
-          "Произошла ошибка при навигации. Пожалуйста, начните создание сбора заново с команды /new"
-        );
+        if (dialogState.state === DialogState.CREATING_COLLECTION && dialogState.data) {
+          console.log("Going back to description step", dialogState.data);
+          const newStateData = {
+            ...dialogState.data,
+            step: CollectionCreationStep.DESCRIPTION
+          };
+          
+          await setDialogState(userId, DialogState.CREATING_COLLECTION, newStateData, supabaseAdmin);
+          
+          await answerCallbackQuery(callbackQuery.id, "Возврат к предыдущему шагу");
+          
+          await sendTelegramMessage(
+            chatId,
+            `Текущее описание: "${dialogState.data.description || ''}"\nВведите новое описание:`,
+            {
+              reply_markup: JSON.stringify({
+                inline_keyboard: [
+                  [{ text: "Отменить создание", callback_data: "cancel_creation" }]
+                ]
+              })
+            }
+          );
+          console.log('Successfully handled back_to_description callback');
+        } else {
+          console.log('Dialog state not found or not in creating_collection state:', dialogState);
+          await answerCallbackQuery(callbackQuery.id, "Невозможно вернуться: диалог не най��ен");
+          await resetDialogState(userId, supabaseAdmin);
+          await sendTelegramMessage(
+            chatId, 
+            "Произошла ошибка при навигации. Пожалуйста, начните создание сбора заново с командой /new"
+          );
+        }
+      } catch (error) {
+        console.error('Error handling back_to_description callback:', error);
+        await answerCallbackQuery(callbackQuery.id, "Ошибка при возврате к предыдущему шагу");
+        await sendTelegramMessage(chatId, "Произошла ошибка при навигации. Пожалуйста, начните создание сбора заново с командой /new");
       }
       return;
     }
     
     if (data === 'creation_back_to_amount') {
-      const dialogState = await getDialogState(userId, supabaseAdmin);
-      
-      if (dialogState.state === DialogState.CREATING_COLLECTION && dialogState.data) {
-        console.log("Going back to amount step");
-        const newStateData = {
-          ...dialogState.data,
-          step: CollectionCreationStep.AMOUNT
-        };
+      console.log('Handling back_to_amount callback');
+      try {
+        const dialogState = await getDialogState(userId, supabaseAdmin);
         
-        await setDialogState(userId, DialogState.CREATING_COLLECTION, newStateData, supabaseAdmin);
-        
-        await answerCallbackQuery(callbackQuery.id, "Возврат к предыдущему шагу");
-        
-        await sendTelegramMessage(
-          chatId,
-          `Текущая сумма: ${dialogState.data.target_amount || 0} руб.\nВведите новую сумму:`,
-          {
-            reply_markup: JSON.stringify({
-              inline_keyboard: [
-                [{ text: "Назад", callback_data: "creation_back_to_description" }],
-                [{ text: "Отменить создание", callback_data: "cancel_creation" }]
-              ]
-            })
-          }
-        );
-      } else {
-        await answerCallbackQuery(callbackQuery.id, "Невозможно вернуться: диалог не найден");
-        await resetDialogState(userId, supabaseAdmin);
-        await sendTelegramMessage(
-          chatId, 
-          "Произошла ошибка при навигации. Пожалуйста, начните создание сбора заново с команды /new"
-        );
+        if (dialogState.state === DialogState.CREATING_COLLECTION && dialogState.data) {
+          console.log("Going back to amount step", dialogState.data);
+          const newStateData = {
+            ...dialogState.data,
+            step: CollectionCreationStep.AMOUNT
+          };
+          
+          await setDialogState(userId, DialogState.CREATING_COLLECTION, newStateData, supabaseAdmin);
+          
+          await answerCallbackQuery(callbackQuery.id, "Возврат к предыдущему шагу");
+          
+          await sendTelegramMessage(
+            chatId,
+            `Текущая сумма: ${dialogState.data.target_amount || 0} руб.\nВведите новую сумму:`,
+            {
+              reply_markup: JSON.stringify({
+                inline_keyboard: [
+                  [{ text: "Назад", callback_data: "creation_back_to_description" }],
+                  [{ text: "Отменить создание", callback_data: "cancel_creation" }]
+                ]
+              })
+            }
+          );
+          console.log('Successfully handled back_to_amount callback');
+        } else {
+          console.log('Dialog state not found or not in creating_collection state:', dialogState);
+          await answerCallbackQuery(callbackQuery.id, "Невозможно вернуться: диалог не найден");
+          await resetDialogState(userId, supabaseAdmin);
+          await sendTelegramMessage(
+            chatId, 
+            "Произошла ошибка при навигации. Пожалуйста, начните создание сбора заново с командой /new"
+          );
+        }
+      } catch (error) {
+        console.error('Error handling back_to_amount callback:', error);
+        await answerCallbackQuery(callbackQuery.id, "Ошибка при возврате к предыдущему шагу");
+        await sendTelegramMessage(chatId, "Произошла ошибка при навигации. Пожалуйста, начните создание сбора заново с командой /new");
       }
       return;
     }
@@ -378,7 +414,7 @@ export async function handleCallbackQuery(
           const finishedCollections = collections.filter(c => c.status === "finished");
           const cancelledCollections = collections.filter(c => c.status === "cancelled");
           
-          let message = "📊 *Все сборы в системе:*\n\n";
+          let message = "📊 *Все сбо��ы в системе:*\n\n";
           
           if (activeCollections.length > 0) {
             message += "🟢 *Активные сборы:*\n";

@@ -1,9 +1,9 @@
-
 /**
  * Утилиты для работы с коллекциями
  */
 
 import { DialogState, CollectionCreationData, CollectionCreationStep, setDialogState } from "./dialogStateManager.ts";
+import { getUserUuidByTelegramId } from "./databaseUtils.ts";
 
 /**
  * Обновление состояния создания коллекции
@@ -37,7 +37,17 @@ export async function createCollection(
       return { success: false, error: "Некорректный идентификатор создателя" };
     }
     
-    // Создаем новую запись о сборе
+    // Получаем UUID пользователя по его Telegram ID
+    const creatorUuid = await getUserUuidByTelegramId(collection.creator_id, supabaseAdmin);
+    
+    if (!creatorUuid) {
+      console.error(`Could not find UUID for user with Telegram ID: ${collection.creator_id}`);
+      return { success: false, error: "Пользователь не найден в системе" };
+    }
+    
+    console.log(`Using creator UUID: ${creatorUuid} for Telegram ID: ${collection.creator_id}`);
+    
+    // Создаем новую запись о сборе с использованием UUID вместо Telegram ID
     const { data, error } = await supabaseAdmin
       .from("collections")
       .insert({
@@ -46,18 +56,17 @@ export async function createCollection(
         target_amount: collection.target_amount,
         current_amount: collection.current_amount || 0,
         deadline: collection.deadline,
-        creator_id: collection.creator_id,
+        creator_id: creatorUuid, // Используем UUID вместо Telegram ID
         status: collection.status || "active"
       })
-      .select()
-      .maybeSingle();
+      .select();
     
     if (error) {
       console.error("Error creating collection:", error);
       return { success: false, error: error.message };
     }
     
-    return { success: true, collection: data };
+    return { success: true, collection: data[0] };
   } catch (error) {
     console.error("Exception creating collection:", error);
     return { success: false, error: error.message };
@@ -136,16 +145,26 @@ export async function getCollection(
  */
 export async function getUserCollections(
   supabaseAdmin: any,
-  userId: string,
+  telegramId: string,
   status: string | null = null
 ) {
   try {
-    console.log(`Getting collections for user ${userId} with status ${status || 'any'}`);
+    console.log(`Getting collections for user telegram ID ${telegramId} with status ${status || 'any'}`);
     
-    if (!userId || typeof userId !== 'string') {
-      console.error("Invalid userId:", userId);
+    if (!telegramId || typeof telegramId !== 'string') {
+      console.error("Invalid telegramId:", telegramId);
       return { success: false, error: "Некорректный идентификатор пользователя" };
     }
+    
+    // Get the user UUID from telegram_id
+    const userUuid = await getUserUuidByTelegramId(telegramId, supabaseAdmin);
+    
+    if (!userUuid) {
+      console.error(`Could not find UUID for user with Telegram ID: ${telegramId}`);
+      return { success: false, error: "Пользователь не найден в системе" };
+    }
+    
+    console.log(`Found UUID ${userUuid} for Telegram ID ${telegramId}, fetching collections`);
     
     let query = supabaseAdmin
       .from("collections")
@@ -159,7 +178,7 @@ export async function getUserCollections(
         status, 
         deadline
       `)
-      .eq("creator_id", userId)
+      .eq("creator_id", userUuid)  // Use UUID instead of Telegram ID
       .order('created_at', { ascending: false });
     
     if (status) {
