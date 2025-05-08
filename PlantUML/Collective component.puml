@@ -1,0 +1,41 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+skinparam component {
+  BackgroundColor<<new>> #e6f2ff
+  BorderColor<<new>> #003366
+}
+
+package "Telegram Bot (Long Polling)" {
+  [Bot Launcher\n(bot.launch())] --> [Command Handler]
+  [Bot Launcher\n(bot.launch())] --> [Message Handler]
+
+  [Command Handler] --> [Command Validator]
+  [Command Handler] --> [Dialog State Manager]
+  [Command Handler] --> [Collection Utils]
+  [Command Handler] --> [Database Utils]
+
+  [Message Handler] --> [Dialog State Manager]
+
+  component "Bot API Layer\n(for Mini App)" <<new>> as BotAPI
+  BotAPI --> [Command Handler]
+  BotAPI --> [Collection Utils]
+  BotAPI --> [Database Utils]
+}
+
+[Command Validator] --> [commandRules.json]
+[Dialog State Manager] --> [Supabase DB]
+[Collection Utils] --> [Supabase DB]
+[Database Utils] --> [Supabase DB]
+
+package "Mini App" {
+  component "Telegram Mini App UI" <<new>> as MiniAppUI
+  component "Mini App Backend\n(API Consumer)" <<new>> as MiniAppBackend
+
+  MiniAppUI --> MiniAppBackend : HTTP API
+  MiniAppBackend --> BotAPI : REST/JSON
+}
+
+
+@enduml
