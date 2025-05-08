@@ -18,4 +18,4 @@ verify_jwt = false
 
 [functions.docs]
 verify_jwt = false
-included_files = ["index.html", "group_collect_api.yaml"]
+included_files = ["supabase/functions/docs/index.html", "supabase/functions/docs/group_collect_api.yaml"]
