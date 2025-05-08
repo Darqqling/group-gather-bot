@@ -16,6 +16,10 @@ verify_jwt = false
 [functions.bot-api]
 verify_jwt = false
 
+
 [functions.docs]
+included_files = [
+  "supabase/functions/docs/index.html",
+  "supabase/functions/docs/group_collect_api.yaml"
+]
 verify_jwt = false
-included_files = ["supabase/functions/docs/index.html", "supabase/functions/docs/group_collect_api.yaml"]
