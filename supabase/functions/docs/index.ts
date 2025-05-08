@@ -7,10 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Read the HTML and YAML files
-const html = await Deno.readTextFile(new URL("./index.html", import.meta.url));
-const yaml = await Deno.readTextFile(new URL("./group_collect_api.yaml", import.meta.url));
-
 // Main server function
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -28,6 +24,17 @@ serve(async (req) => {
     // Remove the /docs prefix if it exists (for local development vs production)
     const normalizedPath = pathname.replace(/^\/docs/, "");
     console.log(`Normalized path: ${normalizedPath}`);
+    
+    // Read the files dynamically
+    let html, yaml;
+    try {
+      html = await Deno.readTextFile(new URL("./index.html", import.meta.url));
+      yaml = await Deno.readTextFile(new URL("./group_collect_api.yaml", import.meta.url));
+      console.log("Successfully read files");
+    } catch (fileError) {
+      console.error("Error reading files:", fileError);
+      throw fileError;
+    }
     
     // Serve YAML file
     if (normalizedPath.endsWith("/group_collect_api.yaml") || normalizedPath === "/group_collect_api.yaml") {

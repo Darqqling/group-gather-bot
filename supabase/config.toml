@@ -18,3 +18,4 @@ verify_jwt = false
 
 [functions.docs]
 verify_jwt = false
+included_files = ["index.html", "group_collect_api.yaml"]
