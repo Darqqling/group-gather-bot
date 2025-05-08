@@ -15,3 +15,6 @@ verify_jwt = false
 
 [functions.bot-api]
 verify_jwt = false
+
+[functions.docs]
+verify_jwt = false
