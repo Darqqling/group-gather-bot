@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { deleteWebhook } from "@/services/webhookService";
 
 let pollingActive = false;
 let pollingTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -28,6 +29,15 @@ export async function startPolling(): Promise<{ success: boolean, error?: string
 
     // Reset any local storage errors
     localStorage.removeItem('telegram_polling_error');
+
+    // Before starting polling, ensure webhook is disabled
+    try {
+      console.log("Disabling webhook before starting polling...");
+      await deleteWebhook();
+    } catch (webhookError) {
+      console.warn("Non-critical error when disabling webhook:", webhookError);
+      // Continue despite webhook error - polling should work anyway
+    }
 
     // Call the polling function and start the polling cycle
     const result = await pollTelegram();
