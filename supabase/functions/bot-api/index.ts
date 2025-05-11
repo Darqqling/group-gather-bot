@@ -11,7 +11,7 @@ const corsHeaders = {
 // Routes definition - will be expanded in the future
 const routes = {
   "GET /health": handleHealthCheck,
-  "GET /api/health": handleHealthCheck, // Alternative path
+  "GET /": handleHealthCheck, // Root path also returns health check
 };
 
 // Simple health check handler
@@ -40,6 +40,11 @@ serve(async (req) => {
     
     // Log the incoming request
     console.log(`Bot API request: ${req.method} ${path}`);
+
+    // If the path contains /health, handle it as a health check
+    if (path.includes('/health')) {
+      return handleHealthCheck(req);
+    }
 
     // Find the appropriate route handler
     for (const [routePattern, routeHandler] of Object.entries(routes)) {

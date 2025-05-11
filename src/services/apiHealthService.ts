@@ -9,15 +9,13 @@ interface HealthCheckResult {
   message?: string;
 }
 
-const PROJECT_ID = "smlqmythgpkucxbaxuob";
-const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtbHFteXRoZ3BrdWN4YmF4dW9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1NTMxMjEsImV4cCI6MjA2MTEyOTEyMX0.ns2zOcH6JElPYV-f6MrXEN1sRsIVS6pOWSPzAxAJ2Us";
-
 export async function checkApiHealth(): Promise<HealthCheckResult> {
   try {
     // Use the supabase functions invoke method for calling edge functions
-    const { data, error } = await supabase.functions.invoke('bot-api', {
+    // Supabase v2 doesn't accept 'path' property in FunctionInvokeOptions
+    // Instead, we include the path in the function name
+    const { data, error } = await supabase.functions.invoke('bot-api/health', {
       method: 'GET',
-      path: '/health',
     });
 
     if (error) {
