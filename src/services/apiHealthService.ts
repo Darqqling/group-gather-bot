@@ -12,7 +12,8 @@ const PROJECT_ID = "smlqmythgpkucxbaxuob";
 
 export async function checkApiHealth(): Promise<HealthCheckResult> {
   try {
-    const response = await fetch(`https://${PROJECT_ID}.supabase.co/functions/v1/bot-api/api/health`, {
+    // Updated URL to correctly point to the bot-api endpoint
+    const response = await fetch(`https://${PROJECT_ID}.supabase.co/functions/v1/bot-api/health`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
