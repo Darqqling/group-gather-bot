@@ -16,7 +16,6 @@ verify_jwt = false
 [functions.bot-api]
 verify_jwt = false
 
-
 [functions.docs]
 included_files = [
   "supabase/functions/docs/index.html",

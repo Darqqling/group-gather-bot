@@ -21,36 +21,35 @@ serve(async (req) => {
     
     console.log(`Docs request: ${req.method} ${pathname}`);
     
-    // Remove the /docs prefix if it exists (for local development vs production)
-    const normalizedPath = pathname.replace(/^\/docs/, "");
-    console.log(`Normalized path: ${normalizedPath}`);
+    // Determine which file to serve
+    let contentType = "text/html";
+    let content = "";
     
-    // Read the files dynamically
-    let html, yaml;
-    try {
-      html = await Deno.readTextFile(new URL("./index.html", import.meta.url));
-      yaml = await Deno.readTextFile(new URL("./group_collect_api.yaml", import.meta.url));
-      console.log("Successfully read files");
-    } catch (fileError) {
-      console.error("Error reading files:", fileError);
-      throw fileError;
+    if (pathname.endsWith("group_collect_api.yaml") || pathname.includes("group_collect_api.yaml")) {
+      // Serve the YAML file directly from the included_files
+      contentType = "application/yaml";
+      try {
+        content = await Deno.readTextFile("group_collect_api.yaml");
+        console.log("Successfully read YAML file");
+      } catch (error) {
+        console.error("Error reading YAML file:", error);
+        throw error;
+      }
+    } else {
+      // Serve the HTML file by default
+      try {
+        content = await Deno.readTextFile("index.html");
+        console.log("Successfully read HTML file");
+      } catch (error) {
+        console.error("Error reading HTML file:", error);
+        throw error;
+      }
     }
     
-    // Serve YAML file
-    if (normalizedPath.endsWith("/group_collect_api.yaml") || normalizedPath === "/group_collect_api.yaml") {
-      return new Response(yaml, { 
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/yaml" 
-        } 
-      });
-    }
-    
-    // Serve HTML by default
-    return new Response(html, { 
+    return new Response(content, { 
       headers: { 
         ...corsHeaders, 
-        "Content-Type": "text/html" 
+        "Content-Type": contentType
       } 
     });
   } catch (error) {

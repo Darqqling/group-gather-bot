@@ -10,12 +10,13 @@ const corsHeaders = {
 
 // Routes definition - will be expanded in the future
 const routes = {
-  "GET /api/health": handleHealthCheck,
-  "GET /health": handleHealthCheck, // Add an alternative route pattern
+  "GET /health": handleHealthCheck,
+  "GET /api/health": handleHealthCheck, // Alternative path
 };
 
 // Simple health check handler
 function handleHealthCheck(_req: Request): Response {
+  console.log("Health check endpoint called");
   return new Response(
     JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }),
     { 
@@ -35,35 +36,23 @@ serve(async (req) => {
   try {
     // Extract the path from the URL
     const url = new URL(req.url);
-    let path = url.pathname;
+    const path = url.pathname;
     
     // Log the incoming request
     console.log(`Bot API request: ${req.method} ${path}`);
-    
-    // Remove the /bot-api prefix if it exists (for local development vs production)
-    const pathParts = path.split("/");
-    if (pathParts.length > 1 && pathParts[1] === "bot-api") {
-      pathParts.splice(1, 1);
-      path = pathParts.join("/");
-      console.log(`Normalized path: ${path}`);
-    }
 
     // Find the appropriate route handler
-    let handler = null;
     for (const [routePattern, routeHandler] of Object.entries(routes)) {
       const [method, routePath] = routePattern.split(" ");
       
-      if (req.method === method && (path === routePath || `/${path.split("/").filter(Boolean).join("/")}` === routePath)) {
-        handler = routeHandler;
-        break;
+      if (req.method === method && (path === routePath || path.endsWith(routePath))) {
+        console.log(`Matched route: ${routePattern}`);
+        return routeHandler(req);
       }
     }
 
-    if (handler) {
-      return handler(req);
-    }
-
     // Return 404 for undefined routes
+    console.log(`No route matched for: ${req.method} ${path}`);
     return new Response(
       JSON.stringify({ error: "Not found", path }),
       { 
