@@ -6,6 +6,8 @@ import { startPolling, stopPolling, resetPolling } from "@/services/telegramPoll
 import { useEffect, useState } from "react";
 import { Bot, Play, RefreshCw, StopCircle } from "lucide-react";
 import AppVersion from "@/components/AppVersion";
+import HealthStatus from "@/components/dashboard/HealthStatus";
+import VersionInfo from "@/components/dashboard/VersionInfo";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -155,6 +157,16 @@ export default function Dashboard() {
             </Button>
           </CardFooter>
         </Card>
+        
+        <HealthStatus />
+        
+        <VersionInfo 
+          version="0.1.0" 
+          lastUpdated="2025-05-08 17:00" 
+          changes="• Добавлена страница Mini App
+• Исправлена работа API health endpoint
+• Добавлена информация о текущей версии" 
+        />
         
         <AppVersion />
       </div>

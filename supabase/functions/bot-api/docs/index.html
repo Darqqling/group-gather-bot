@@ -1,0 +1,18 @@
+<!-- functions/bot-api/docs/index.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Bot API Docs</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css" />
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+    <script>
+      SwaggerUIBundle({
+        url: "/functions/bot-api/public/group_collect_api.yaml", //было /functions/v1/bot-api/public/group_collect_api.yaml 
+        dom_id: "#swagger-ui"
+      });
+    </script>
+  </body>
+</html>

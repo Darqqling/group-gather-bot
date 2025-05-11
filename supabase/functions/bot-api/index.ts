@@ -11,12 +11,13 @@ const corsHeaders = {
 // Routes definition - will be expanded in the future
 const routes = {
   "GET /api/health": handleHealthCheck,
+  "GET /health": handleHealthCheck, // Add an alternative route pattern
 };
 
 // Simple health check handler
 function handleHealthCheck(_req: Request): Response {
   return new Response(
-    JSON.stringify({ status: "ok" }),
+    JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }),
     { 
       status: 200, 
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -34,14 +35,29 @@ serve(async (req) => {
   try {
     // Extract the path from the URL
     const url = new URL(req.url);
-    const path = url.pathname;
+    let path = url.pathname;
     
     // Log the incoming request
     console.log(`Bot API request: ${req.method} ${path}`);
+    
+    // Remove the /bot-api prefix if it exists (for local development vs production)
+    const pathParts = path.split("/");
+    if (pathParts.length > 1 && pathParts[1] === "bot-api") {
+      pathParts.splice(1, 1);
+      path = pathParts.join("/");
+      console.log(`Normalized path: ${path}`);
+    }
 
     // Find the appropriate route handler
-    const routeKey = `${req.method} ${path}`;
-    const handler = routes[routeKey as keyof typeof routes];
+    let handler = null;
+    for (const [routePattern, routeHandler] of Object.entries(routes)) {
+      const [method, routePath] = routePattern.split(" ");
+      
+      if (req.method === method && (path === routePath || `/${path.split("/").filter(Boolean).join("/")}` === routePath)) {
+        handler = routeHandler;
+        break;
+      }
+    }
 
     if (handler) {
       return handler(req);

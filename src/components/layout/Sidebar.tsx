@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,8 @@ import {
   Users, 
   LogOut,
   HelpCircle,
-  MessageCircle
+  MessageCircle,
+  AppWindow
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -48,6 +50,7 @@ const Sidebar = ({ open, setOpen }: { open: boolean; setOpen: (open: boolean) =>
                 cn("flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
                 isActive ? "bg-accent text-accent-foreground" : "transparent")
               }
+              end
             >
               <Home className="h-5 w-5" />
               Dashboard
@@ -78,6 +81,15 @@ const Sidebar = ({ open, setOpen }: { open: boolean; setOpen: (open: boolean) =>
             >
               <BarChart3 className="h-5 w-5" />
               Analytics
+            </NavLink>
+            <NavLink to="/miniapp" 
+              className={({isActive}) => 
+                cn("flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+                isActive ? "bg-accent text-accent-foreground" : "transparent")
+              }
+            >
+              <AppWindow className="h-5 w-5" />
+              Mini App
             </NavLink>
             <NavLink to="/settings" 
               className={({isActive}) => 
